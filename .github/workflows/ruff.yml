@@ -46,10 +46,10 @@ jobs:
       - name: Run Bandit Security Check
         run: |
           if [ -s python_files.txt ]; then
-            bandit -r . --format sarif --output bandit-report.sarif || echo "Bandit found issues or failed, but continuing."
+            bandit -r . --format sarif --output bandit-report.sarif || echo "Bandit failed or found issues, but continuing."
           else
             echo "Skipping Bandit because no Python files were found."
-            touch bandit-report.sarif # Create empty SARIF file to avoid upload failure
+            echo '{"version": "2.1.0", "runs": []}' > bandit-report.sarif
           fi
         continue-on-error: true
 
@@ -60,4 +60,6 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: bandit-report.sarif
+        env:
+          CODEQL_ACTION_DISABLE_TELEMETRY: true # Disable telemetry to avoid warnings
         if: always()
