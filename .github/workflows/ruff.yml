@@ -19,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.12" # Укажите нужную версию Python
+          python-version: "3.12"
 
       - name: Install Ruff and Bandit
         run: pip install ruff bandit
@@ -33,33 +33,14 @@ jobs:
       - name: Run Ruff Additional Checks
         run: ruff check --select ANN,B,A,RET,SLF,PTH,TD,ERA,PL,RSE --line-length 120 --output-format=github .
 
-      - name: Check for Python files
+      - name: Check for Python files and run Bandit
         run: |
           find . -name "*.py" > python_files.txt
           if [ -s python_files.txt ]; then
             echo "Python files found:"
             cat python_files.txt
+            echo "Running Bandit security check..."
+            bandit -r . || echo "Bandit found security issues or failed, but continuing..."
           else
-            echo "No Python files found in the repository."
+            echo "No Python files found in the repository. Skipping Bandit."
           fi
-
-      - name: Run Bandit Security Check
-        run: |
-          if [ -s python_files.txt ]; then
-            bandit -r . --format sarif --output bandit-report.sarif || echo "Bandit failed or found issues, but continuing."
-          else
-            echo "Skipping Bandit because no Python files were found."
-            echo '{"version": "2.1.0", "runs": []}' > bandit-report.sarif
-          fi
-        continue-on-error: true
-
-      - name: List files for debugging
-        run: ls -la
-
-      - name: Upload Bandit SARIF report
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: bandit-report.sarif
-        env:
-          CODEQL_ACTION_DISABLE_TELEMETRY: true # Disable telemetry to avoid warnings
-        if: always()
