@@ -20,35 +20,41 @@ from src.product_availability_domain.infrastructure.persistence.mysql_ean_availa
 
 
 @pytest.fixture
-def mock_ean_availability_repository():
+def mock_ean_availability_repository() -> Mock:
     """Mock for MySQLEANAvailabilityRepository."""
     return Mock(spec=MySQLEANAvailabilityRepository)
 
 
 @pytest.fixture
-def mock_ean_availability_api_client():
+def mock_ean_availability_api_client() -> Mock:
     """Mock for EANAvailabilityApiClient."""
     return Mock(spec=EANAvailabilityApiClient)
 
 
 @pytest.fixture
-def ean_availability_service(mock_ean_availability_repository, mock_ean_availability_api_client):
+def ean_availability_service(
+    mock_ean_availability_repository: Mock, mock_ean_availability_api_client: Mock
+) -> EANAvailabilityApplicationService:
     """Instance of EANAvailabilityApplicationService with mocked dependencies."""
     return EANAvailabilityApplicationService(
-        availability_repo=mock_ean_availability_repository, api_client=mock_ean_availability_api_client,
+        availability_repo=mock_ean_availability_repository,
+        api_client=mock_ean_availability_api_client,
     )
 
 
 @pytest.fixture
-def sample_supplier_request_dto():
+def sample_supplier_request_dto() -> SupplierRequestDTO:
     """Sample SupplierRequestDTO for tests."""
     return SupplierRequestDTO(
-        retailer_id="RET001", supplier_id="SUP007", supplier_gln="1234567890123", supplier_name="Example Supplier Corp",
+        retailer_id="RET001",
+        supplier_id="SUP007",
+        supplier_gln="1234567890123",
+        supplier_name="Example Supplier Corp",
     )
 
 
 @pytest.fixture
-def sample_eans_to_fetch():
+def sample_eans_to_fetch() -> list[str]:
     """Sample list of EANs to fetch."""
     return ["1234567890001", "1234567890002", "1234567890003"]
 
@@ -57,12 +63,12 @@ def sample_eans_to_fetch():
 
 
 def test_sync_ean_availability_success(
-    ean_availability_service,
-    mock_ean_availability_api_client,
-    mock_ean_availability_repository,
-    sample_supplier_request_dto,
-    sample_eans_to_fetch,
-):
+    ean_availability_service: EANAvailabilityApplicationService,
+    mock_ean_availability_api_client: Mock,
+    mock_ean_availability_repository: Mock,
+    sample_supplier_request_dto: SupplierRequestDTO,
+    sample_eans_to_fetch: list[str],
+) -> None:
     """
     Tests successful synchronization of EAN availability data.
     Verifies that the API client is called and data is saved to the repository.
@@ -74,7 +80,8 @@ def test_sync_ean_availability_success(
         EANAvailabilityItemDTO(ean="1234567890003", quantity=5, price=75.50),
     ]
     mock_api_response_dto = EANAvailabilityResponseDTO(
-        supplier_request=sample_supplier_request_dto, availability_items=mock_api_response_items,
+        supplier_request=sample_supplier_request_dto,
+        availability_items=mock_api_response_items,
     )
     mock_ean_availability_api_client.fetch_ean_availability.return_value = mock_api_response_dto
 
@@ -84,35 +91,40 @@ def test_sync_ean_availability_success(
     # Assertions
     # 1. API client was called correctly
     mock_ean_availability_api_client.fetch_ean_availability.assert_called_once_with(
-        sample_supplier_request_dto, sample_eans_to_fetch,
+        sample_supplier_request_dto,
+        sample_eans_to_fetch,
     )
     # 2. Repository's save method was called for each item
     assert mock_ean_availability_repository.save_ean_availability_item.call_count == len(mock_api_response_items)
     mock_ean_availability_repository.save_ean_availability_item.assert_any_call(
-        sample_supplier_request_dto, mock_api_response_items[0],
+        sample_supplier_request_dto,
+        mock_api_response_items[0],
     )
     mock_ean_availability_repository.save_ean_availability_item.assert_any_call(
-        sample_supplier_request_dto, mock_api_response_items[1],
+        sample_supplier_request_dto,
+        mock_api_response_items[1],
     )
     mock_ean_availability_repository.save_ean_availability_item.assert_any_call(
-        sample_supplier_request_dto, mock_api_response_items[2],
+        sample_supplier_request_dto,
+        mock_api_response_items[2],
     )
 
 
 def test_sync_ean_availability_no_data_from_api(
-    ean_availability_service,
-    mock_ean_availability_api_client,
-    mock_ean_availability_repository,
-    sample_supplier_request_dto,
-    sample_eans_to_fetch,
-):
+    ean_availability_service: EANAvailabilityApplicationService,
+    mock_ean_availability_api_client: Mock,
+    mock_ean_availability_repository: Mock,
+    sample_supplier_request_dto: SupplierRequestDTO,
+    sample_eans_to_fetch: list[str],
+) -> None:
     """
     Tests synchronization when the API returns no data.
     Verifies that no save operations are performed on the repository.
     """
     # Mock the API client's response with empty items
     mock_api_response_dto = EANAvailabilityResponseDTO(
-        supplier_request=sample_supplier_request_dto, availability_items=[],
+        supplier_request=sample_supplier_request_dto,
+        availability_items=[],
     )
     mock_ean_availability_api_client.fetch_ean_availability.return_value = mock_api_response_dto
 
@@ -125,12 +137,12 @@ def test_sync_ean_availability_no_data_from_api(
 
 
 def test_sync_ean_availability_api_error(
-    ean_availability_service,
-    mock_ean_availability_api_client,
-    mock_ean_availability_repository,
-    sample_supplier_request_dto,
-    sample_eans_to_fetch,
-):
+    ean_availability_service: EANAvailabilityApplicationService,
+    mock_ean_availability_api_client: Mock,
+    mock_ean_availability_repository: Mock,
+    sample_supplier_request_dto: SupplierRequestDTO,
+    sample_eans_to_fetch: list[str],
+) -> None:
     """
     Tests synchronization when the API client raises an APIError.
     Verifies that the error is propagated and no save operations occur.
@@ -147,12 +159,12 @@ def test_sync_ean_availability_api_error(
 
 
 def test_sync_ean_availability_database_error(
-    ean_availability_service,
-    mock_ean_availability_api_client,
-    mock_ean_availability_repository,
-    sample_supplier_request_dto,
-    sample_eans_to_fetch,
-):
+    ean_availability_service: EANAvailabilityApplicationService,
+    mock_ean_availability_api_client: Mock,
+    mock_ean_availability_repository: Mock,
+    sample_supplier_request_dto: SupplierRequestDTO,
+    sample_eans_to_fetch: list[str],
+) -> None:
     """
     Tests synchronization when the repository raises a DatabaseError during save.
     Verifies that the error is propagated.
@@ -160,7 +172,8 @@ def test_sync_ean_availability_database_error(
     # Mock the API client's response
     mock_api_response_items = [EANAvailabilityItemDTO(ean="1234567890001", quantity=10, price=99.99)]
     mock_api_response_dto = EANAvailabilityResponseDTO(
-        supplier_request=sample_supplier_request_dto, availability_items=mock_api_response_items,
+        supplier_request=sample_supplier_request_dto,
+        availability_items=mock_api_response_items,
     )
     mock_ean_availability_api_client.fetch_ean_availability.return_value = mock_api_response_dto
 
@@ -176,8 +189,10 @@ def test_sync_ean_availability_database_error(
 
 
 def test_get_ean_availabilities_by_supplier(
-    ean_availability_service, mock_ean_availability_repository, sample_supplier_request_dto,
-):
+    ean_availability_service: EANAvailabilityApplicationService,
+    mock_ean_availability_repository: Mock,
+    sample_supplier_request_dto: SupplierRequestDTO,
+) -> None:
     """
     Tests retrieving EAN availabilities by supplier GLN.
     Verifies that the repository method is called and returns expected data.
@@ -187,7 +202,8 @@ def test_get_ean_availabilities_by_supplier(
         EANAvailabilityItemDTO(ean="1234567890002", quantity=0, price=49.99),
     ]
     expected_response_dto = EANAvailabilityResponseDTO(
-        supplier_request=sample_supplier_request_dto, availability_items=mock_db_response_items,
+        supplier_request=sample_supplier_request_dto,
+        availability_items=mock_db_response_items,
     )
     mock_ean_availability_repository.get_ean_availabilities_by_supplier.return_value = [expected_response_dto]
 
@@ -205,7 +221,7 @@ def test_get_ean_availabilities_by_supplier(
 # --- Tests for MySQLEANAvailabilityRepository (focused on interaction, not actual DB) ---
 
 
-def test_mysql_ean_availability_repository_create_tables_success(mocker):
+def test_mysql_ean_availability_repository_create_tables_success(mocker: Mock) -> None:
     """
     Tests that create_tables attempts to connect to DB and execute SQL queries.
     Uses a context manager to mock the connection and cursor.
@@ -231,7 +247,9 @@ def test_mysql_ean_availability_repository_create_tables_success(mocker):
     mock_cursor.close.assert_called_once()  # Verify cursor closed
 
 
-def test_mysql_ean_availability_repository_save_ean_availability_item(mocker, sample_supplier_request_dto):
+def test_mysql_ean_availability_repository_save_ean_availability_item(
+    mocker: Mock, sample_supplier_request_dto: SupplierRequestDTO
+) -> None:
     """
     Tests that save_ean_availability_item calls the correct SQL INSERT/UPDATE.
     """
@@ -254,7 +272,9 @@ def test_mysql_ean_availability_repository_save_ean_availability_item(mocker, sa
     mock_cursor.close.assert_called_once()
 
 
-def test_mysql_ean_availability_repository_get_ean_availabilities_by_supplier(mocker, sample_supplier_request_dto):
+def test_mysql_ean_availability_repository_get_ean_availabilities_by_supplier(
+    mocker: Mock, sample_supplier_request_dto: SupplierRequestDTO
+) -> None:
     """
     Tests that get_ean_availabilities_by_supplier calls SELECT and parses results.
     """
