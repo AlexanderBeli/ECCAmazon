@@ -43,30 +43,27 @@ jobs:
             echo "No Python files found in the repository."
           fi
 
+      - name: Create empty SARIF file first
+        run: |
+          echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "bandit"}}, "results": []}]}' > bandit-report.sarif
+          echo "Created empty SARIF file as backup"
+
       - name: Run Bandit Security Check
         run: |
           if [ -s python_files.txt ]; then
             echo "Running Bandit on Python files..."
             bandit -r . --format sarif --output bandit-report.sarif || {
-              echo "Bandit found issues or failed, creating empty SARIF report"
-              echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "bandit"}}, "results": []}]}' > bandit-report.sarif
+              echo "Bandit found issues or failed, keeping backup SARIF report"
             }
           else
-            echo "No Python files found, creating empty SARIF report."
-            echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "bandit"}}, "results": []}]}' > bandit-report.sarif
+            echo "No Python files found, using empty SARIF report."
           fi
 
-      - name: Verify SARIF file exists
+      - name: Verify SARIF file
         run: |
-          if [ -f bandit-report.sarif ]; then
-            echo "SARIF file exists:"
-            ls -la bandit-report.sarif
-            echo "SARIF content preview:"
-            head -n 10 bandit-report.sarif
-          else
-            echo "SARIF file does not exist, creating minimal one"
-            echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "bandit"}}, "results": []}]}' > bandit-report.sarif
-          fi
+          ls -la bandit-report.sarif
+          echo "SARIF content:"
+          cat bandit-report.sarif
 
       - name: Upload Bandit SARIF report
         uses: github/codeql-action/upload-sarif@v3
