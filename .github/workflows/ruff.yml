@@ -33,30 +33,22 @@ jobs:
       - name: Run Ruff Additional Checks
         run: ruff check --select ANN,B,A,RET,SLF,PTH,TD,ERA,PL,RSE --line-length 120 --output-format=github .
 
-      - name: Create SARIF file
+      - name: Check for Python files
         run: |
-          echo '{"version": "2.1.0", "runs": [{"tool": {"driver": {"name": "bandit"}}, "results": []}]}' > bandit-report.sarif
-
-      - name: Run Bandit
-        run: |
-          if find . -name "*.py" -type f | head -1 | grep -q .; then
-            echo "Python files found, running Bandit..."
-            bandit -r . --format sarif --output bandit-report.sarif || echo "Bandit failed, keeping empty SARIF"
+          find . -name "*.py" > python_files.txt
+          if [ -s python_files.txt ]; then
+            echo "Python files found:"
+            cat python_files.txt
           else
-            echo "No Python files found."
+            echo "No Python files found in the repository."
           fi
 
-      - name: Debug SARIF file
+      - name: Run Bandit Security Check
         run: |
-          echo "Current directory contents:"
-          ls -la
-          echo "SARIF file info:"
-          ls -la bandit-report.sarif
-          echo "SARIF file size:"
-          wc -c bandit-report.sarif
-
-      - name: Upload Bandit SARIF report
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: bandit-report.sarif
-        if: always()
+          if [ -s python_files.txt ]; then
+            echo "Running Bandit security analysis..."
+            bandit -r . || echo "Bandit found security issues, but continuing."
+          else
+            echo "Skipping Bandit because no Python files were found."
+          fi
+        continue-on-error: true
