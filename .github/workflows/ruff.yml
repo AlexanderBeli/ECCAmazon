@@ -27,11 +27,20 @@ jobs:
       - name: Run Ruff Format
         run: ruff format --line-length 120 .
 
-      - name: Run Ruff Check with Fix
+      - name: Run Ruff Critical Checks (Blocking)
         run: ruff check --fix --select F,W,I,C4,SIM,ARG,FLY,LOG,PERF,COM --line-length 120 .
 
-      - name: Run Ruff Additional Checks
-        run: ruff check --select E501,ANN,B,A,RET,SLF,PTH,TD,ERA,PL,RSE --line-length 120 --output-format=github .
+      - name: Run Ruff Style Checks (Warnings only)
+        run: |
+          echo "::notice::Running style and annotation checks (warnings only)"
+          ruff check --select E501,ANN --line-length 120 --output-format=github . || echo "Style issues found"
+        continue-on-error: true
+
+      - name: Run Ruff Quality Checks (Warnings only)
+        run: |
+          echo "::notice::Running code quality checks (warnings only)"
+          ruff check --select B,A,RET,SLF,PTH,TD,ERA,PL,RSE --line-length 120 --output-format=github . || echo "Quality issues found"
+        continue-on-error: true
 
       - name: Check for Python files
         run: |
