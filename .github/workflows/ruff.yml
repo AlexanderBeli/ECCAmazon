@@ -55,9 +55,30 @@ jobs:
       - name: Run Bandit Security Check
         run: |
           if [ -s python_files.txt ]; then
-            echo "Running Bandit security analysis..."
-            bandit -r . || echo "Bandit found security issues, but continuing."
+            echo "::notice::Running Bandit security analysis"
+            # Запускаем Bandit с выводом в формате GitHub Actions
+            bandit -r . --format custom --msg-template '{relpath}:{line}: {severity}: {test_id}[bandit]: {msg}' | while IFS= read -r line; do
+              if [[ $line =~ ^.*:[0-9]+:.*:(LOW|MEDIUM|HIGH):.* ]]; then
+                # Парсим вывод и создаем аннотации
+                file_line=$(echo "$line" | cut -d':' -f1-2)
+                severity=$(echo "$line" | cut -d':' -f3 | xargs)
+                message=$(echo "$line" | cut -d':' -f4- | xargs)
+                
+                case $severity in
+                  HIGH)
+                    echo "::error file=$file_line::$message"
+                    ;;
+                  MEDIUM)
+                    echo "::warning file=$file_line::$message"
+                    ;;
+                  LOW)
+                    echo "::notice file=$file_line::$message"
+                    ;;
+                esac
+              else
+                echo "$line"
+              fi
+            done || echo "Bandit completed analysis"
           else
-            echo "Skipping Bandit because no Python files were found."
+            echo "No Python files found, skipping Bandit."
           fi
-        continue-on-error: true
