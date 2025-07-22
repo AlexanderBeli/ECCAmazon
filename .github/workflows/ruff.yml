@@ -55,30 +55,31 @@ jobs:
       - name: Run Bandit Security Check
         run: |
           if [ -s python_files.txt ]; then
-            echo "::notice::Running Bandit security analysis"
-            # Запускаем Bandit с выводом в формате GitHub Actions
-            bandit -r . --format custom --msg-template '{relpath}:{line}: {severity}: {test_id}[bandit]: {msg}' | while IFS= read -r line; do
-              if [[ $line =~ ^.*:[0-9]+:.*:(LOW|MEDIUM|HIGH):.* ]]; then
-                # Парсим вывод и создаем аннотации
-                file_line=$(echo "$line" | cut -d':' -f1-2)
-                severity=$(echo "$line" | cut -d':' -f3 | xargs)
-                message=$(echo "$line" | cut -d':' -f4- | xargs)
-                
-                case $severity in
+          echo "::notice::Running Bandit security analysis"
+          # Run Bandit with custom format and process output for annotations
+          bandit -r . --format custom --msg-template '{relpath}:{line}: {severity}: {test_id}[bandit]: {msg}' | while IFS= read -r line; do
+              # Skip empty lines or non-matching lines
+              if [[ $line =~ ^([^:]+:[0-9]+):[[:space:]]*(LOW|MEDIUM|HIGH):[[:space:]]*(.*)$ ]]; then
+              file_line="${BASH_REMATCH[1]}"
+              severity="${BASH_REMATCH[2]}"
+              message="${BASH_REMATCH[3]}"
+              
+              case $severity in
                   HIGH)
-                    echo "::error file=$file_line::$message"
-                    ;;
+                  echo "::error file=$file_line::$message"
+                  ;;
                   MEDIUM)
-                    echo "::warning file=$file_line::$message"
-                    ;;
+                  echo "::warning file=$file_line::$message"
+                  ;;
                   LOW)
-                    echo "::notice file=$file_line::$message"
-                    ;;
-                esac
+                  echo "::notice file=$file_line::$message"
+                  ;;
+              esac
               else
-                echo "$line"
+              # Log non-matching lines as debug (optional)
+              echo "::debug::$line"
               fi
-            done || echo "Bandit completed analysis"
+          done || echo "Bandit completed analysis"
           else
-            echo "No Python files found, skipping Bandit."
+          echo "No Python files found, skipping Bandit."
           fi
