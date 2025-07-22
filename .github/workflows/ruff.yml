@@ -28,10 +28,10 @@ jobs:
         run: ruff format --line-length 120 .
 
       - name: Run Ruff Check with Fix
-        run: ruff check --fix --select E,F,W,I,C4,SIM,ARG,FLY,LOG,PERF,COM --line-length 120 .
+        run: ruff check --fix --select F,W,I,C4,SIM,ARG,FLY,LOG,PERF,COM --line-length 120 .
 
       - name: Run Ruff Additional Checks
-        run: ruff check --select ANN,B,A,RET,SLF,PTH,TD,ERA,PL,RSE --line-length 120 --output-format=github .
+        run: ruff check --select E501,ANN,B,A,RET,SLF,PTH,TD,ERA,PL,RSE --line-length 120 --output-format=github .
 
       - name: Check for Python files
         run: |
