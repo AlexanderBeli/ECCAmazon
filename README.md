@@ -104,3 +104,7 @@ pytest
 ```
 
 This command will discover and run all tests defined in the tests/ directory. The tests use mocking to simulate external API calls and database interactions, ensuring they are fast and isolated.
+
+## Contributing
+
+Contributions are welcome! Please feel free to open issues or submit pull requests.
