@@ -1,0 +1,27 @@
+"""EAN Availability repository interface."""
+
+from abc import ABC, abstractmethod
+from typing import Optional
+
+from src.common.dtos.availability_dtos import SupplierContextDTO, GtinStockItemDTO, GtinStockResponseDTO
+
+# If you decide to map DTOs to domain entities within the application service,
+# then this repository would work with EANAvailability entities. For simplicity,
+# we can let it work directly with DTOs for now.
+
+
+class IGtinStockRepository(ABC):
+    @abstractmethod
+    def save_gtin_stock_item(self, supplier_context: SupplierContextDTO, item: GtinStockItemDTO) -> None:
+        """Saves or updates a single GTIN stock item with its supplier context."""
+        pass
+
+    @abstractmethod
+    def get_gtin_stock_by_supplier_context(self, supplier_context: SupplierContextDTO) -> GtinStockResponseDTO:
+        """Retrieves all GTIN stock for a given supplier and retailer context."""
+        pass
+
+    @abstractmethod
+    def get_gtin_stock_by_gtin_and_supplier(self, gtin: str, supplier_gln: str) -> GtinStockItemDTO | None:
+        """Retrieves a specific GTIN stock item by GTIN and supplier GLN."""
+        pass
