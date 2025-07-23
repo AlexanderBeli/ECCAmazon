@@ -1,8 +1,6 @@
-"""EAN Availability repository interface."""
+"""GTIN (EAN) Availability repository interface."""
 
 from abc import ABC, abstractmethod
-from typing import Optional
-
 from src.common.dtos.availability_dtos import SupplierContextDTO, GtinStockItemDTO, GtinStockResponseDTO
 
 # If you decide to map DTOs to domain entities within the application service,
