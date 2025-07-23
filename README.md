@@ -20,8 +20,8 @@ The project follows a modular, layered architecture:
       - `infrastructure/`: Provides concrete implementations for `IArticleRepository` (e.g., `MySQLArticleRepository` saving to `pds_articles` tables) and `ECCApiClient`.
     - **`product_availability_domain/`**: A dedicated Bounded Context for **Product Availability and Pricing data**. This module handles the synchronization of EAN (GTIN) codes, quantities, and prices, typically associated with a specific retailer and supplier context.
       - `application/`: Application services for use cases like "sync EAN availability data".
-      - `domain/`: Defines `EANAvailability` entities, `SupplierInfo` value objects, and abstract `IEANAvailabilityRepository` interfaces.
-      - `infrastructure/`: Provides concrete implementations for `IEANAvailabilityRepository` (e.g., `MySQLEANAvailabilityRepository` saving to `pds_gtins_stock` table) and `EANAvailabilityApiClient` for external API integration.
+      - `domain/`: Defines `EANAvailability` entities, `SupplierInfo` value objects, and abstract `IGtinStockRepository` interfaces.
+      - `infrastructure/`: Provides concrete implementations for `IGtinStockRepository` (e.g., `MySQLGtinStockRepository` saving to `pds_gtins_stock` table) and `GlobalStockApiClient` for external API integration.
     - **`marketplace_integration/`**: A separate Bounded Context for future integrations with marketplaces (e.g., Amazon, eBay). It mirrors the layered structure of other domains for similar reasons of modularity and scalability.
 
 2.  **`main.py`**: The entry point of the application, responsible for setting up dependency injection and initiating the main process flows for different domains. It also handles initial database table creation.
@@ -104,3 +104,4 @@ pytest
 ```
 
 This command will discover and run all tests defined in the tests/ directory. The tests use mocking to simulate external API calls and database interactions, ensuring they are fast and isolated.
+ApiClient
