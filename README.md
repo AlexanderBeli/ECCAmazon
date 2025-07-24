@@ -94,6 +94,11 @@ python main.py
 
 The project uses `pytest` for unit and integration testing.
 
+```bash
+export PYTHONPATH=$PYTHONPATH:/Users/alexander/Documents/Marcus/
+pytest
+```
+
 ### Run Tests
 
 Navigate to the root directory of your project (where `src/` and `tests/` are located) and run `pytest`
