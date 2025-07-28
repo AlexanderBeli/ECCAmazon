@@ -23,3 +23,13 @@ class IGtinStockRepository(ABC):
     def get_gtin_stock_by_gtin_and_supplier(self, gtin: str, supplier_gln: str) -> GtinStockItemDTO | None:
         """Retrieves a specific GTIN stock item by GTIN and supplier GLN."""
         pass
+
+    @abstractmethod
+    def get_all_gtin_codes(self) -> list[str]:
+        """Retrieves all unique GTIN codes from stock table."""
+        pass
+
+    @abstractmethod
+    def get_unique_supplier_glns(self) -> list[str]:
+        """Retrieves all unique supplier GLNs from stock table."""
+        pass

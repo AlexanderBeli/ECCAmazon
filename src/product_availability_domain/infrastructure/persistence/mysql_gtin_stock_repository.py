@@ -169,6 +169,52 @@ class MySQLGtinStockRepository(IGtinStockRepository):
             cursor.close()
         return item_dto
 
+    def get_all_gtin_codes(self) -> list[str]:
+        """Retrieves all unique GTIN codes from pds_gtin_stock table."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("SELECT DISTINCT gtin FROM pds_gtin_stock WHERE gtin IS NOT NULL AND gtin != ''")
+            results = cursor.fetchall()
+            return [row[0] for row in results]
+        except Error as e:
+            raise DatabaseError(f"Error fetching GTIN codes: {e}", original_exception=e)
+        finally:
+            cursor.close()
+
+    def get_unique_supplier_glns(self) -> list[str]:
+        """Retrieves all unique supplier GLNs from pds_gtin_stock table."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                "SELECT DISTINCT supplier_gln FROM pds_gtin_stock WHERE supplier_gln IS NOT NULL AND supplier_gln != ''"
+            )
+            results = cursor.fetchall()
+            return [row[0] for row in results]
+        except Error as e:
+            raise DatabaseError(f"Error fetching supplier GLNs: {e}", original_exception=e)
+        finally:
+            cursor.close()
+
+    def get_all_supplier_gtin_pairs(self) -> list[tuple[str, str]]:
+        """Retrieves all unique supplier_gln and gtin pairs."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute(
+                "SELECT DISTINCT supplier_gln, gtin FROM pds_gtin_stock WHERE supplier_gln IS NOT NULL AND supplier_gln != '' AND gtin IS NOT NULL AND gtin != ''"
+            )
+            results = cursor.fetchall()
+            return [(row[0], row[1]) for row in results]
+        except Error as e:
+            raise DatabaseError(f"Error fetching all supplier GLN and GTIN pairs: {e}", original_exception=e)
+        finally:
+            cursor.close()
+
     def __del__(self) -> None:
         """Closes the database connection when the object is destroyed."""
         if self._connection and self._connection.is_connected():
