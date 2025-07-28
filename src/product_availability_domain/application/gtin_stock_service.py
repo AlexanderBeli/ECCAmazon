@@ -67,3 +67,11 @@ class GtinStockApplicationService:
     def get_supplier_stock_data(self, supplier_context: SupplierContextDTO) -> GtinStockResponseDTO:
         """Retrieves GTIN stock data for a specific supplier context from the database."""
         return self.stock_repo.get_gtin_stock_by_supplier_context(supplier_context)
+
+    def get_all_gtin_codes(self) -> list[str]:
+        """Retrieves all unique GTIN codes from stock table."""
+        return self.stock_repo.get_all_gtin_codes()
+
+    def get_unique_supplier_glns(self) -> list[str]:
+        """Retrieves all unique supplier GLNs from stock table."""
+        return self.stock_repo.get_unique_supplier_glns()
