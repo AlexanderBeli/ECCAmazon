@@ -2,6 +2,11 @@
 
 This project implements a service for synchronizing product data from various external sources (e.g., ECC API, [EAN Availability API](https://ecc-online.net)) into a MySQL database with option to export it to Excel. It is designed with a layered architecture, incorporating Domain-Driven Design (DDD) principles and Data Transfer Objects (DTOs) to ensure scalability, maintainability, and extensibility for future integrations with marketplaces like Amazon and eBay.
 
+- [Architecture Overview](#architecture-overview)
+- [Getting Started](#getting-started)
+- [Testing](#testing)
+- [Contributing](#contributing)
+
 ## Architecture Overview
 
 The project follows a modular, layered architecture:
@@ -25,6 +30,8 @@ The project follows a modular, layered architecture:
     - **`marketplace_integration/`**: A separate Bounded Context for future integrations with marketplaces (e.g., Amazon, eBay). It mirrors the layered structure of other domains for similar reasons of modularity and scalability.
 
 2.  **`main.py`**: The entry point of the application, responsible for setting up dependency injection and initiating the main process flows for different domains. It also handles initial database table creation.
+
+For now use only `step1_main.py`.
 
 3.  **`tests/`**: Contains unit and integration tests, mirroring the `src/` directory structure.
 

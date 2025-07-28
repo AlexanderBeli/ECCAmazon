@@ -1,26 +1,39 @@
+# src/product_availability_domain/domain/repositories/gtin_stock_repository
 """GTIN (EAN) Availability repository interface."""
-
 from abc import ABC, abstractmethod
-from src.common.dtos.availability_dtos import SupplierContextDTO, GtinStockItemDTO, GtinStockResponseDTO
+from typing import Optional
 
-# If you decide to map DTOs to domain entities within the application service,
-# then this repository would work with EANAvailability entities. For simplicity,
-# we can let it work directly with DTOs for now.
+from src.common.dtos.availability_dtos import (
+    GtinStockItemDTO,
+    GtinStockResponseDTO,
+    SupplierContextDTO,
+)
 
 
 class IGtinStockRepository(ABC):
+
     @abstractmethod
     def save_gtin_stock_item(self, supplier_context: SupplierContextDTO, item: GtinStockItemDTO) -> None:
         """Saves or updates a single GTIN stock item with its supplier context."""
         pass
 
     @abstractmethod
-    def get_gtin_stock_by_supplier_context(self, supplier_context: SupplierContextDTO) -> GtinStockResponseDTO:
-        """Retrieves all GTIN stock for a given supplier and retailer context."""
+    def batch_save_gtin_stock_items(self, supplier_context: SupplierContextDTO, items: list[GtinStockItemDTO]) -> None:
+        """Batch saves multiple GTIN stock items for better performance."""
         pass
 
     @abstractmethod
-    def get_gtin_stock_by_gtin_and_supplier(self, gtin: str, supplier_gln: str) -> GtinStockItemDTO | None:
+    def check_existing_gtin_supplier_pairs(self, gtin_supplier_pairs: list[tuple[str, str]]) -> set[tuple[str, str]]:
+        """Checks which GTIN-Supplier pairs already exist in the database."""
+        pass
+
+    @abstractmethod
+    def get_gtin_stock_by_supplier_context(self, supplier_context: SupplierContextDTO) -> GtinStockResponseDTO:
+        """Retrieves all GTIN stock for a given supplier context."""
+        pass
+
+    @abstractmethod
+    def get_gtin_stock_by_gtin_and_supplier(self, gtin: str, supplier_gln: str) -> Optional[GtinStockItemDTO]:
         """Retrieves a specific GTIN stock item by GTIN and supplier GLN."""
         pass
 
@@ -32,4 +45,9 @@ class IGtinStockRepository(ABC):
     @abstractmethod
     def get_unique_supplier_glns(self) -> list[str]:
         """Retrieves all unique supplier GLNs from stock table."""
+        pass
+
+    @abstractmethod
+    def get_all_supplier_gtin_pairs(self) -> list[tuple[str, str]]:
+        """Retrieves all unique supplier_gln and gtin pairs."""
         pass

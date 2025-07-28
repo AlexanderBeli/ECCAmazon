@@ -1,23 +1,22 @@
 # tests/test_product_availability_domain/test_infrastructure/test_mysql_gtin_stock_repository.py
-"""Tests for the MySQLGtinStockRepository."""
+
+from datetime import datetime
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
-from unittest.mock import Mock, patch, MagicMock
-from datetime import datetime
 import pytz
 from mysql.connector import Error
 
-# Import DTOs and specific repository class
+from src.common.config.settings import settings
+from src.common.dtos.availability_dtos import (
+    GtinStockItemDTO,
+    GtinStockResponseDTO,
+    SupplierContextDTO,
+)
+from src.common.exceptions.custom_exceptions import DatabaseError
 from src.product_availability_domain.infrastructure.persistence.mysql_gtin_stock_repository import (
     MySQLGtinStockRepository,
 )
-from src.common.dtos.availability_dtos import SupplierContextDTO, GtinStockItemDTO, GtinStockResponseDTO
-from src.common.exceptions.custom_exceptions import DatabaseError
-from src.common.config.settings import settings  # Needed for patching settings in new tests
-
-
-# All fixtures (mock_settings_retailer_info, sample_supplier_context_dto, sample_gtin_stock_item_dto_js)
-# are automatically available from conftest.py
 
 
 def test_mysql_gtin_stock_repository_create_tables_success(mocker) -> None:
@@ -30,7 +29,7 @@ def test_mysql_gtin_stock_repository_create_tables_success(mocker) -> None:
     mock_connection.return_value.cursor.return_value = mock_cursor
 
     repo = MySQLGtinStockRepository()
-    repo._connection = None  # Ensure a fresh mock for the connection attribute
+    repo._connection = None
 
     repo.create_tables()
 
@@ -39,8 +38,6 @@ def test_mysql_gtin_stock_repository_create_tables_success(mocker) -> None:
     assert mock_cursor.execute.call_count == 1
     mock_connection.return_value.commit.assert_called_once()
     mock_cursor.close.assert_called_once()
-    # No mock_connection.close() assertion here, as the repository keeps the connection open
-    # until __del__ or explicit closure.
 
 
 def test_mysql_gtin_stock_repository_save_gtin_stock_item(
@@ -63,7 +60,6 @@ def test_mysql_gtin_stock_repository_save_gtin_stock_item(
     assert mock_cursor.execute.call_args[0][0].strip().startswith("INSERT INTO pds_gtin_stock")
     mock_connection.return_value.commit.assert_called_once()
     mock_cursor.close.assert_called_once()
-    # No mock_connection.close() assertion here.
 
 
 def test_mysql_gtin_stock_repository_get_gtin_stock_by_supplier_context(mocker, sample_supplier_context_dto) -> None:
@@ -80,8 +76,8 @@ def test_mysql_gtin_stock_repository_get_gtin_stock_by_supplier_context(mocker, 
     # Simulate database rows returned
     mock_cursor.fetchall.return_value = [
         {
-            "retailer_id": sample_supplier_context_dto.retailer_id,
-            "retailer_gln": sample_supplier_context_dto.retailer_gln,
+            "retailer_id": "NOT_USED",  # These fields are no longer in the DB schema for this table
+            "retailer_gln": "NOT_USED",
             "supplier_id": sample_supplier_context_dto.supplier_id,
             "supplier_gln": sample_supplier_context_dto.supplier_gln,
             "supplier_name": sample_supplier_context_dto.supplier_name,
@@ -92,8 +88,8 @@ def test_mysql_gtin_stock_repository_get_gtin_stock_by_supplier_context(mocker, 
             "timestamp": datetime(2023, 1, 1, 10, 0, 0, tzinfo=pytz.utc),
         },
         {
-            "retailer_id": sample_supplier_context_dto.retailer_id,
-            "retailer_gln": sample_supplier_context_dto.retailer_gln,
+            "retailer_id": "NOT_USED",
+            "retailer_gln": "NOT_USED",
             "supplier_id": sample_supplier_context_dto.supplier_id,
             "supplier_gln": sample_supplier_context_dto.supplier_gln,
             "supplier_name": sample_supplier_context_dto.supplier_name,
@@ -110,12 +106,9 @@ def test_mysql_gtin_stock_repository_get_gtin_stock_by_supplier_context(mocker, 
     mock_connection.assert_called_once()
     mock_cursor.execute.assert_called_once()
     assert mock_cursor.execute.call_args[0][0].strip().startswith("SELECT gtin, quantity, stock_traffic_light")
-    assert mock_cursor.execute.call_args[0][1] == (
-        sample_supplier_context_dto.supplier_gln,
-        sample_supplier_context_dto.retailer_gln,
-    )
+    # FIX: Assert only for supplier_gln, as retailer_gln is no longer a parameter for this specific query
+    assert mock_cursor.execute.call_args[0][1] == (sample_supplier_context_dto.supplier_gln,)
     mock_cursor.close.assert_called_once()
-    # No mock_connection.close() assertion here.
 
     assert isinstance(result, GtinStockResponseDTO)
     assert result.supplier_context == sample_supplier_context_dto
@@ -149,7 +142,7 @@ def test_get_all_gtin_codes_success(
 
     mock_connect.return_value = mock_connection
     mock_connection.cursor.return_value = mock_cursor
-    mock_connection.is_connected.return_value = True  # Ensure connection appears active
+    mock_connection.is_connected.return_value = True
 
     expected_gtins = [("1234567890123",), ("1234567890124",), ("1234567890125",)]
     mock_cursor.fetchall.return_value = expected_gtins
@@ -164,8 +157,6 @@ def test_get_all_gtin_codes_success(
         "SELECT DISTINCT gtin FROM pds_gtin_stock WHERE gtin IS NOT NULL AND gtin != ''"
     )
     mock_cursor.close.assert_called_once()
-    # Removed mock_connection.close.assert_called_once()
-    # because the repository keeps the connection open.
 
 
 @patch("mysql.connector.connect")
@@ -187,7 +178,6 @@ def test_get_all_gtin_codes_empty_result(
     # Assert
     assert result == []
     mock_cursor.close.assert_called_once()
-    # Removed mock_connection.close.assert_called_once()
 
 
 @patch("mysql.connector.connect")
@@ -208,8 +198,6 @@ def test_get_all_gtin_codes_database_error(
         mysql_gtin_stock_repository_with_mock_settings.get_all_gtin_codes()
 
     mock_cursor.close.assert_called_once()
-    # Removed mock_connection.close.assert_called_once() because the
-    # repository keeps the connection open even on error, and __del__ handles it.
 
 
 @patch("mysql.connector.connect")
@@ -237,7 +225,6 @@ def test_get_unique_supplier_glns_success(
         "SELECT DISTINCT supplier_gln FROM pds_gtin_stock WHERE supplier_gln IS NOT NULL AND supplier_gln != ''"
     )
     mock_cursor.close.assert_called_once()
-    # Removed mock_connection.close.assert_called_once()
 
 
 @patch("mysql.connector.connect")
@@ -259,7 +246,6 @@ def test_get_unique_supplier_glns_empty_result(
     # Assert
     assert result == []
     mock_cursor.close.assert_called_once()
-    # Removed mock_connection.close.assert_called_once()
 
 
 @patch("mysql.connector.connect")
@@ -280,7 +266,6 @@ def test_get_unique_supplier_glns_database_error(
         mysql_gtin_stock_repository_with_mock_settings.get_unique_supplier_glns()
 
     mock_cursor.close.assert_called_once()
-    # Removed mock_connection.close.assert_called_once()
 
 
 @patch("mysql.connector.connect")
@@ -293,32 +278,18 @@ def test_connection_reuse(
     mock_cursor = MagicMock()
     mock_connect.return_value = mock_connection
     mock_connection.cursor.return_value = mock_cursor
-    mock_connection.is_connected.return_value = True  # Simulate connection is always active
-    mock_cursor.fetchall.return_value = []  # Return empty for simplicity
+    mock_connection.is_connected.return_value = True
+    mock_cursor.fetchall.return_value = []
 
     # Act
     mysql_gtin_stock_repository_with_mock_settings.get_all_gtin_codes()
     mysql_gtin_stock_repository_with_mock_settings.get_unique_supplier_glns()
 
     # Assert
-    # The _get_connection method is called twice internally, but it should only
-    # call mysql.connector.connect() once if the connection remains active.
-    mock_connect.assert_called_once()  # Connection created only once
+    mock_connect.assert_called_once()
 
-    # The cursor should be closed for each operation
     assert mock_cursor.close.call_count == 2
-    assert mock_cursor.execute.call_count == 2  # Both queries executed
-
-    # We do NOT assert mock_connection.close() here, as the connection
-    # is only closed in __del__, which happens later.
-    # To test __del__ specifically, you'd need to explicitly delete the object
-    # or let it go out of scope and then assert on the mock.
-
-    # Optional: If you wanted to explicitly test the __del__ behavior (less common but possible)
-    # import gc
-    # del mysql_gtin_stock_repository_with_mock_settings # Trigger garbage collection
-    # gc.collect() # Force collection
-    # mock_connection.close.assert_called_once() # This would pass if __del__ runs immediately
+    assert mock_cursor.execute.call_count == 2
 
 
 @patch("mysql.connector.connect")
@@ -327,15 +298,10 @@ def test_connection_error(
 ) -> None:
     """Test handling of connection errors."""
     # Arrange
-    # Configure mock_connect to raise an error *when called*
     mock_connect.side_effect = Error("Connection failed")
 
     # Act & Assert
     with pytest.raises(DatabaseError, match="Failed to connect to MySQL"):
         mysql_gtin_stock_repository_with_mock_settings.get_all_gtin_codes()
 
-    # Assert that mysql.connector.connect was attempted once
     mock_connect.assert_called_once()
-    # In this error case, no connection object is successfully created,
-    # so there's nothing to close, and thus no mock_connection.close() assertion.
-    # The repository's finally blocks only close the cursor, not the connection itself.
