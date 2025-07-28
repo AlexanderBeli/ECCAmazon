@@ -31,6 +31,8 @@ The project follows a modular, layered architecture:
 
 2.  **`main.py`**: The entry point of the application, responsible for setting up dependency injection and initiating the main process flows for different domains. It also handles initial database table creation.
 
+For now use only `step1_main.py`.
+
 3.  **`tests/`**: Contains unit and integration tests, mirroring the `src/` directory structure.
 
 4.  **`requirements.txt`**: Lists all project dependencies.
