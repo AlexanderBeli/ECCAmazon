@@ -1,17 +1,24 @@
 # tests/test_gtin_stock_application_service.py
 """Tests for the GTIN Stock Application Service."""
 
-import pytest
-from unittest.mock import Mock, patch
 import json
 from datetime import datetime
+from unittest.mock import Mock, patch
+
+import pytest
 import pytz
 
-# Import DTOs and exceptions if not already covered by fixtures' imports
-from src.common.dtos.availability_dtos import SupplierContextDTO, GtinStockItemDTO, GtinStockResponseDTO
-from src.common.exceptions.custom_exceptions import APIError, DatabaseError
-from src.common.config.settings import settings  # Required for SupplierContextDTO creation with settings
+from src.common.config.settings import (
+    settings,  # Required for SupplierContextDTO creation with settings
+)
 
+# Import DTOs and exceptions if not already covered by fixtures' imports
+from src.common.dtos.availability_dtos import (
+    GtinStockItemDTO,
+    GtinStockResponseDTO,
+    SupplierContextDTO,
+)
+from src.common.exceptions.custom_exceptions import APIError, DatabaseError
 
 # All fixtures (mock_gtin_stock_repository, mock_global_stock_api_client, gtin_stock_service,
 # sample_supplier_context_dto, sample_suppliers_json_data, sample_gtin_stock_item_dto_list,
@@ -29,7 +36,7 @@ def test_sync_all_supplier_stock_success(
 ) -> None:
     """
     Tests successful synchronization of GTIN stock data for multiple suppliers.
-    Verifies API client calls and repository save operations.
+    Verifies API client calls and repository batch save operations.
     """
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(sample_suppliers_json_data)))
     mocker.patch("json.load", return_value=sample_suppliers_json_data)
@@ -48,9 +55,8 @@ def test_sync_all_supplier_stock_success(
         GtinStockResponseDTO(
             supplier_context=SupplierContextDTO(
                 retailer_id=settings.RETAILER_ID,
-                retailer_gln=settings.RETAILER_GLN,  # This is correct and sufficient
+                retailer_gln=settings.RETAILER_GLN,
                 supplier_id=564,
-                # retailer_gln="4262543480008",  <-- REMOVE THIS DUPLICATE LINE
                 supplier_gln="5790000017089",
                 supplier_name="Ecco Schuhe GmbH",
             ),
@@ -62,10 +68,8 @@ def test_sync_all_supplier_stock_success(
 
     assert mock_global_stock_api_client.fetch_gtin_stock_data.call_count == len(sample_suppliers_json_data)
 
-    # For Josef Seibel (2 items) + Ecco (1 item) = 3 total save calls
-    assert mock_gtin_stock_repository.save_gtin_stock_item.call_count == (
-        len(sample_gtin_stock_item_dto_list) + len(sample_gtin_stock_item_dto_list_ecco)
-    )
+    # Assert batch_save_gtin_stock_items was called twice (once for each supplier)
+    assert mock_gtin_stock_repository.batch_save_gtin_stock_items.call_count == len(sample_suppliers_json_data)
 
     first_supplier_context = SupplierContextDTO(
         retailer_id=settings.RETAILER_ID,
@@ -74,23 +78,23 @@ def test_sync_all_supplier_stock_success(
         supplier_gln="4042834000005",
         supplier_name="Josef Seibel",
     )
-    mock_gtin_stock_repository.save_gtin_stock_item.assert_any_call(
-        first_supplier_context, sample_gtin_stock_item_dto_list[0]
+    mock_gtin_stock_repository.batch_save_gtin_stock_items.assert_any_call(
+        first_supplier_context, sample_gtin_stock_item_dto_list
     )
-    mock_gtin_stock_repository.save_gtin_stock_item.assert_any_call(
-        first_supplier_context, sample_gtin_stock_item_dto_list[1]
-    )
-    # Also assert for the Ecco item
+
     second_supplier_context = SupplierContextDTO(
         retailer_id=settings.RETAILER_ID,
-        retailer_gln=settings.RETAILER_GLN,  # This is the corrected line
+        retailer_gln=settings.RETAILER_GLN,
         supplier_id=564,
         supplier_gln="5790000017089",
         supplier_name="Ecco Schuhe GmbH",
     )
-    mock_gtin_stock_repository.save_gtin_stock_item.assert_any_call(
-        second_supplier_context, sample_gtin_stock_item_dto_list_ecco[0]
+    mock_gtin_stock_repository.batch_save_gtin_stock_items.assert_any_call(
+        second_supplier_context, sample_gtin_stock_item_dto_list_ecco
     )
+
+    # Ensure individual save_gtin_stock_item was NOT called by sync_all_supplier_stock
+    mock_gtin_stock_repository.save_gtin_stock_item.assert_not_called()
 
 
 def test_sync_all_supplier_stock_no_data_from_api(
@@ -153,9 +157,24 @@ def test_sync_all_supplier_stock_api_error(
     gtin_stock_service.sync_all_supplier_stock("dummy_path/suppliers.json")
 
     assert mock_global_stock_api_client.fetch_gtin_stock_data.call_count == len(sample_suppliers_json_data)
-    assert (
-        mock_gtin_stock_repository.save_gtin_stock_item.call_count == 1
-    )  # Only the second supplier's item should be saved
+
+    # Assert batch_save_gtin_stock_items was called once for the successful supplier
+    assert mock_gtin_stock_repository.batch_save_gtin_stock_items.call_count == 1
+
+    # Verify that the correct supplier's data was attempted to be saved
+    second_supplier_context = SupplierContextDTO(
+        retailer_id=settings.RETAILER_ID,
+        retailer_gln=settings.RETAILER_GLN,
+        supplier_id=564,
+        supplier_gln="5790000017089",
+        supplier_name="Ecco Schuhe GmbH",
+    )
+    mock_gtin_stock_repository.batch_save_gtin_stock_items.assert_called_once_with(
+        second_supplier_context, sample_gtin_stock_item_dto_list_ecco
+    )
+
+    # Ensure individual save_gtin_stock_item was NOT called
+    mock_gtin_stock_repository.save_gtin_stock_item.assert_not_called()
 
 
 def test_sync_all_supplier_stock_database_error(
@@ -168,7 +187,7 @@ def test_sync_all_supplier_stock_database_error(
     mocker,
 ) -> None:
     """
-    Tests synchronization when the repository raises a DatabaseError during save.
+    Tests synchronization when the repository raises a DatabaseError during batch save.
     Verifies that the error is caught and synchronization continues for other suppliers.
     """
     mocker.patch("builtins.open", mocker.mock_open(read_data=json.dumps(sample_suppliers_json_data)))
@@ -183,7 +202,7 @@ def test_sync_all_supplier_stock_database_error(
                 supplier_gln="4042834000005",
                 supplier_name="Josef Seibel",
             ),
-            stock_items=[sample_gtin_stock_item_dto_list[0]],  # Only one item from JS to make the error distinct
+            stock_items=[sample_gtin_stock_item_dto_list[0]],  # Only one item from JS for this specific test case
         ),
         GtinStockResponseDTO(
             supplier_context=SupplierContextDTO(
@@ -197,16 +216,45 @@ def test_sync_all_supplier_stock_database_error(
         ),
     ]
 
-    # Configure the mock repository to raise an exception on save for the first item
-    mock_gtin_stock_repository.save_gtin_stock_item.side_effect = [
-        DatabaseError("DB save failed for Josef Seibel item"),
-        None,  # Succeed for subsequent calls (Ecco's item)
+    # Configure the mock repository to raise an exception on the first batch save (Josef Seibel)
+    # and succeed on the second (Ecco).
+    mock_gtin_stock_repository.batch_save_gtin_stock_items.side_effect = [
+        DatabaseError("DB batch save failed for Josef Seibel items"),
+        None,  # Succeed for Ecco's batch
     ]
 
     gtin_stock_service.sync_all_supplier_stock("dummy_path/suppliers.json")
 
-    # Verify that save was called for all items, despite the error on the first (1 from JS + 1 from Ecco = 2 calls)
-    assert mock_gtin_stock_repository.save_gtin_stock_item.call_count == 2
+    # Verify that batch_save_gtin_stock_items was called for both suppliers,
+    # despite the error on the first one.
+    assert mock_gtin_stock_repository.batch_save_gtin_stock_items.call_count == len(sample_suppliers_json_data)
+
+    first_supplier_context = SupplierContextDTO(
+        retailer_id=settings.RETAILER_ID,
+        retailer_gln=settings.RETAILER_GLN,
+        supplier_id=87,
+        supplier_gln="4042834000005",
+        supplier_name="Josef Seibel",
+    )
+    # Assert that batch_save was called for Josef Seibel with its item
+    mock_gtin_stock_repository.batch_save_gtin_stock_items.assert_any_call(
+        first_supplier_context, [sample_gtin_stock_item_dto_list[0]]
+    )
+
+    second_supplier_context = SupplierContextDTO(
+        retailer_id=settings.RETAILER_ID,
+        retailer_gln=settings.RETAILER_GLN,
+        supplier_id=564,
+        supplier_gln="5790000017089",
+        supplier_name="Ecco Schuhe GmbH",
+    )
+    # Assert that batch_save was called for Ecco with its items
+    mock_gtin_stock_repository.batch_save_gtin_stock_items.assert_any_call(
+        second_supplier_context, sample_gtin_stock_item_dto_list_ecco
+    )
+
+    # Ensure individual save_gtin_stock_item was NOT called
+    mock_gtin_stock_repository.save_gtin_stock_item.assert_not_called()
 
 
 def test_get_supplier_stock_data(gtin_stock_service, mock_gtin_stock_repository, sample_supplier_context_dto) -> None:
