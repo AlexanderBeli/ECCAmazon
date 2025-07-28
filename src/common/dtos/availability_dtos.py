@@ -1,8 +1,10 @@
+# src/common/dtos/availability_dtos
+
 """Data Transfer Objects for Product Availability data."""
 
+import json
 from dataclasses import dataclass, field
 from datetime import datetime
-import json
 
 
 @dataclass

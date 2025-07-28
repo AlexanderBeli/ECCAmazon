@@ -1,18 +1,30 @@
+# src/product_availability_domain/mysql_gtin_stock_repository
 """MySQL implementation of GTIN Stock repository."""
+
+import logging
+from datetime import datetime
+from typing import Optional
 
 import mysql.connector
 from mysql.connector import Error
-import logging
-from datetime import datetime
+
 from src.common.config.settings import settings
+from src.common.dtos.availability_dtos import (
+    GtinStockItemDTO,
+    GtinStockResponseDTO,
+    SupplierContextDTO,
+)
 from src.common.exceptions.custom_exceptions import DatabaseError
-from src.common.dtos.availability_dtos import SupplierContextDTO, GtinStockItemDTO, GtinStockResponseDTO
-from src.product_availability_domain.domain.repositories.gtin_stock_repository import IGtinStockRepository
+from src.product_availability_domain.domain.repositories.gtin_stock_repository import (
+    IGtinStockRepository,
+)
 
 logger = logging.getLogger(__name__)
 
+
 class MySQLGtinStockRepository(IGtinStockRepository):
     """MySQL implementation of the GTIN Stock Repository."""
+
     def __init__(self) -> None:
         """Initializes the repository."""
         self._connection = None
@@ -26,6 +38,9 @@ class MySQLGtinStockRepository(IGtinStockRepository):
                     database=settings.DB_DATABASE,
                     user=settings.DB_USER,
                     password=settings.DB_PASSWORD,
+                    autocommit=False,  # Better control over transactions
+                    charset="utf8mb4",
+                    use_unicode=True,
                 )
             except Error as e:
                 raise DatabaseError(f"Failed to connect to MySQL: {e}", original_exception=e)
@@ -33,11 +48,10 @@ class MySQLGtinStockRepository(IGtinStockRepository):
 
     def create_tables(self) -> None:
         """Creates or updates tables for the GTIN Stock domain with 'pds_' prefix."""
+        # Removed retailer_id and retailer_gln as they are constant business values
         create_gtin_stock_table_query = """
         CREATE TABLE IF NOT EXISTS pds_gtin_stock (
             id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-            retailer_id VARCHAR(255) NOT NULL,
-            retailer_gln VARCHAR(255) NOT NULL,
             supplier_id INT UNSIGNED NOT NULL,
             supplier_gln VARCHAR(255) NOT NULL,
             supplier_name VARCHAR(255),
@@ -47,10 +61,10 @@ class MySQLGtinStockRepository(IGtinStockRepository):
             item_type VARCHAR(50),
             timestamp DATETIME,
             date_synced DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY uk_gtin_supplier_retailer (gtin, supplier_gln, retailer_gln), -- Unique per GTIN, supplier, and retailer context
+            UNIQUE KEY uk_gtin_supplier (gtin, supplier_gln), -- Simplified unique constraint
             INDEX idx_supplier_gln (supplier_gln),
-            INDEX idx_retailer_gln (retailer_gln),
-            INDEX idx_gtin (gtin)
+            INDEX idx_gtin (gtin),
+            INDEX idx_gtin_supplier_composite (gtin, supplier_gln) -- Composite index for faster lookups
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """
         conn = self._get_connection()
@@ -58,7 +72,7 @@ class MySQLGtinStockRepository(IGtinStockRepository):
         try:
             cursor.execute(create_gtin_stock_table_query)
             conn.commit()
-            print("PDS GTIN Stock table checked/created.")
+            logger.info("PDS GTIN Stock table checked/created.")
         except Error as e:
             conn.rollback()
             raise DatabaseError(f"Error creating PDS GTIN Stock table: {e}", original_exception=e)
@@ -70,10 +84,11 @@ class MySQLGtinStockRepository(IGtinStockRepository):
         conn = self._get_connection()
         cursor = conn.cursor()
 
+        # Removed retailer fields from the query
         insert_query = """
         INSERT INTO pds_gtin_stock 
-        (retailer_id, retailer_gln, supplier_id, supplier_gln, supplier_name, gtin, quantity, stock_traffic_light, item_type, timestamp)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (supplier_id, supplier_gln, supplier_name, gtin, quantity, stock_traffic_light, item_type, timestamp)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
         ON DUPLICATE KEY UPDATE 
         quantity = VALUES(quantity), 
         stock_traffic_light = VALUES(stock_traffic_light),
@@ -82,8 +97,6 @@ class MySQLGtinStockRepository(IGtinStockRepository):
         date_synced = CURRENT_TIMESTAMP
         """
         params = (
-            supplier_context.retailer_id,
-            supplier_context.retailer_gln,
             supplier_context.supplier_id,
             supplier_context.supplier_gln,
             supplier_context.supplier_name,
@@ -103,8 +116,88 @@ class MySQLGtinStockRepository(IGtinStockRepository):
         finally:
             cursor.close()
 
+    def batch_save_gtin_stock_items(self, supplier_context: SupplierContextDTO, items: list[GtinStockItemDTO]) -> None:
+        """
+        Batch saves multiple GTIN stock items for better performance.
+        Uses executemany for better performance with large datasets.
+        """
+        if not items:
+            return
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        insert_query = """
+        INSERT INTO pds_gtin_stock 
+        (supplier_id, supplier_gln, supplier_name, gtin, quantity, stock_traffic_light, item_type, timestamp)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+        ON DUPLICATE KEY UPDATE 
+        quantity = VALUES(quantity), 
+        stock_traffic_light = VALUES(stock_traffic_light),
+        item_type = VALUES(item_type),
+        timestamp = VALUES(timestamp),
+        date_synced = CURRENT_TIMESTAMP
+        """
+
+        params_list = [
+            (
+                supplier_context.supplier_id,
+                supplier_context.supplier_gln,
+                supplier_context.supplier_name,
+                item.gtin,
+                item.quantity,
+                item.stock_traffic_light,
+                item.item_type,
+                item.timestamp,
+            )
+            for item in items
+        ]
+
+        try:
+            cursor.executemany(insert_query, params_list)
+            conn.commit()
+            logger.info(f"Batch saved {len(items)} GTIN stock items for supplier {supplier_context.supplier_name}")
+        except Error as e:
+            conn.rollback()
+            raise DatabaseError(f"Error batch saving GTIN stock items: {e}", original_exception=e)
+        finally:
+            cursor.close()
+
+    def check_existing_gtin_supplier_pairs(self, gtin_supplier_pairs: list[tuple[str, str]]) -> set[tuple[str, str]]:
+        """
+        Checks which GTIN-Supplier pairs already exist in the database.
+        Returns a set of existing pairs for quick lookup.
+        """
+        if not gtin_supplier_pairs:
+            return set()
+
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            # Create placeholders for the IN clause
+            placeholders = ",".join(["(%s, %s)"] * len(gtin_supplier_pairs))
+            query = f"""
+            SELECT gtin, supplier_gln 
+            FROM pds_gtin_stock 
+            WHERE (gtin, supplier_gln) IN ({placeholders})
+            """
+
+            # Flatten the list of tuples for the query parameters
+            params = [item for pair in gtin_supplier_pairs for item in pair]
+
+            cursor.execute(query, params)
+            results = cursor.fetchall()
+
+            return set((row[0], row[1]) for row in results)
+
+        except Error as e:
+            raise DatabaseError(f"Error checking existing GTIN-Supplier pairs: {e}", original_exception=e)
+        finally:
+            cursor.close()
+
     def get_gtin_stock_by_supplier_context(self, supplier_context: SupplierContextDTO) -> GtinStockResponseDTO:
-        """Retrieves all GTIN stock for a given supplier and retailer context."""
+        """Retrieves all GTIN stock for a given supplier context (retailer context removed from DB)."""
         conn = self._get_connection()
         cursor = conn.cursor(dictionary=True)
 
@@ -114,9 +207,9 @@ class MySQLGtinStockRepository(IGtinStockRepository):
             query = """
             SELECT gtin, quantity, stock_traffic_light, item_type, timestamp
             FROM pds_gtin_stock
-            WHERE supplier_gln = %s AND retailer_gln = %s
+            WHERE supplier_gln = %s
             """
-            cursor.execute(query, (supplier_context.supplier_gln, supplier_context.retailer_gln))
+            cursor.execute(query, (supplier_context.supplier_gln,))
             rows = cursor.fetchall()
 
             for row in rows:
@@ -139,7 +232,7 @@ class MySQLGtinStockRepository(IGtinStockRepository):
         finally:
             cursor.close()
 
-    def get_gtin_stock_by_gtin_and_supplier(self, gtin: str, supplier_gln: str) -> GtinStockItemDTO | None:
+    def get_gtin_stock_by_gtin_and_supplier(self, gtin: str, supplier_gln: str) -> Optional[GtinStockItemDTO]:
         """Retrieves a specific GTIN stock item by GTIN and supplier GLN."""
         conn = self._get_connection()
         cursor = conn.cursor(dictionary=True)
