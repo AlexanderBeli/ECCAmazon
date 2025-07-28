@@ -2,6 +2,11 @@
 
 This project implements a service for synchronizing product data from various external sources (e.g., ECC API, [EAN Availability API](https://ecc-online.net)) into a MySQL database with option to export it to Excel. It is designed with a layered architecture, incorporating Domain-Driven Design (DDD) principles and Data Transfer Objects (DTOs) to ensure scalability, maintainability, and extensibility for future integrations with marketplaces like Amazon and eBay.
 
+- [Architecture Overview](#architecture-overview)
+- [Getting Started](#getting-started)
+- [Testing](#testing)
+- [Contributing](#contributing)
+
 ## Architecture Overview
 
 The project follows a modular, layered architecture:
