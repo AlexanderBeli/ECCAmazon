@@ -1,5 +1,25 @@
 [
   {
+    "SUPPLIER_ID": 809,
+    "SUPPLIER_NAME": "Berkemann",
+    "SUPPLIER_GLN": "4022295000004"
+  },
+  {
+    "SUPPLIER_ID": 52,
+    "SUPPLIER_NAME": "Lugina Schuhfabr. GmbH (Waldläufer)",
+    "SUPPLIER_GLN": "4045266000001"
+  },
+  {
+    "SUPPLIER_ID": 77,
+    "SUPPLIER_NAME": "Rieker Schuh GmbH",
+    "SUPPLIER_GLN": "4020931000005"
+  },
+  {
+    "SUPPLIER_ID": 102,
+    "SUPPLIER_NAME": "Waldi Schuhfabrik GmbH",
+    "SUPPLIER_GLN": "4030457000007"
+  },
+  {
     "SUPPLIER_ID": 87,
     "SUPPLIER_NAME": "Josef Seibel",
     "SUPPLIER_GLN": "4042834000005"
