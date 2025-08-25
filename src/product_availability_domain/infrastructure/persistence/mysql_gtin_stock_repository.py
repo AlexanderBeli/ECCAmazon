@@ -86,11 +86,11 @@ class MySQLGtinStockRepository(IGtinStockRepository):
 
         # Removed retailer fields from the query
         insert_query = """
-        INSERT INTO pds_gtin_stock 
+        INSERT INTO pds_gtin_stock
         (supplier_id, supplier_gln, supplier_name, gtin, quantity, stock_traffic_light, item_type, timestamp)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE 
-        quantity = VALUES(quantity), 
+        ON DUPLICATE KEY UPDATE
+        quantity = VALUES(quantity),
         stock_traffic_light = VALUES(stock_traffic_light),
         item_type = VALUES(item_type),
         timestamp = VALUES(timestamp),
@@ -128,11 +128,11 @@ class MySQLGtinStockRepository(IGtinStockRepository):
         cursor = conn.cursor()
 
         insert_query = """
-        INSERT INTO pds_gtin_stock 
+        INSERT INTO pds_gtin_stock
         (supplier_id, supplier_gln, supplier_name, gtin, quantity, stock_traffic_light, item_type, timestamp)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-        ON DUPLICATE KEY UPDATE 
-        quantity = VALUES(quantity), 
+        ON DUPLICATE KEY UPDATE
+        quantity = VALUES(quantity),
         stock_traffic_light = VALUES(stock_traffic_light),
         item_type = VALUES(item_type),
         timestamp = VALUES(timestamp),
@@ -178,8 +178,8 @@ class MySQLGtinStockRepository(IGtinStockRepository):
             # Create placeholders for the IN clause
             placeholders = ",".join(["(%s, %s)"] * len(gtin_supplier_pairs))
             query = f"""
-            SELECT gtin, supplier_gln 
-            FROM pds_gtin_stock 
+            SELECT gtin, supplier_gln
+            FROM pds_gtin_stock
             WHERE (gtin, supplier_gln) IN ({placeholders})
             """
 
@@ -189,7 +189,7 @@ class MySQLGtinStockRepository(IGtinStockRepository):
             cursor.execute(query, params)
             results = cursor.fetchall()
 
-            return set((row[0], row[1]) for row in results)
+            return {(row[0], row[1]) for row in results}
 
         except Error as e:
             raise DatabaseError(f"Error checking existing GTIN-Supplier pairs: {e}", original_exception=e)
@@ -212,16 +212,16 @@ class MySQLGtinStockRepository(IGtinStockRepository):
             cursor.execute(query, (supplier_context.supplier_gln,))
             rows = cursor.fetchall()
 
-            for row in rows:
-                stock_items.append(
-                    GtinStockItemDTO(
-                        gtin=row["gtin"],
-                        quantity=row["quantity"],
-                        stock_traffic_light=row["stock_traffic_light"],
-                        item_type=row["item_type"],
-                        timestamp=row["timestamp"],
-                    )
+            stock_items = [
+                GtinStockItemDTO(
+                    gtin=row["gtin"],
+                    quantity=row["quantity"],
+                    stock_traffic_light=row["stock_traffic_light"],
+                    item_type=row["item_type"],
+                    timestamp=row["timestamp"],
                 )
+                for row in rows
+            ]
 
             return GtinStockResponseDTO(supplier_context=supplier_context, stock_items=stock_items)
 

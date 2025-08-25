@@ -66,7 +66,6 @@ class TestArticleApplicationService:
         # Arrange
         # Changed: Create supplier_gtin_pairs
         supplier_gtin_pairs = [("5790000017089", "1234567890123")]
-        su_gln = "5790000017089"  # Still useful for the expected print message
         mock_articles = [ArticleDataDTO(eccId=1, ean="1234567890123")]
         self.mock_api_client.fetch_articles_by_gtin.return_value = mock_articles
 

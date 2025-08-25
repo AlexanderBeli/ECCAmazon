@@ -1,22 +1,33 @@
 # tests/conftest.py
-import pytest
-from unittest.mock import Mock
-from datetime import datetime
-import pytz
 import json
+from datetime import datetime
+from typing import Any
+from unittest.mock import Mock
+
+import pytest
+import pytz
+
+from src.common.config.settings import settings
+from src.common.dtos.availability_dtos import (
+    GtinStockItemDTO,
+    GtinStockResponseDTO,
+    SupplierContextDTO,
+)
 
 # Import necessary DTOs and settings
-from src.product_availability_domain.application.gtin_stock_service import GtinStockApplicationService
+from src.product_availability_domain.application.gtin_stock_service import (
+    GtinStockApplicationService,
+)
+from src.product_availability_domain.infrastructure.api_clients.global_stock_api_client import (
+    GlobalStockApiClient,
+)
 from src.product_availability_domain.infrastructure.persistence.mysql_gtin_stock_repository import (
     MySQLGtinStockRepository,
 )
-from src.product_availability_domain.infrastructure.api_clients.global_stock_api_client import GlobalStockApiClient
-from src.common.dtos.availability_dtos import SupplierContextDTO, GtinStockItemDTO, GtinStockResponseDTO
-from src.common.config.settings import settings
 
 
 @pytest.fixture(autouse=True)
-def mock_settings_retailer_info(mocker) -> None:
+def mock_settings_retailer_info(mocker: Any) -> None:
     """Mocks the RETAILER_ID and RETAILER_GLN in settings for consistent testing."""
     mocker.patch.object(settings, "RETAILER_ID", "63153")
     mocker.patch.object(settings, "RETAILER_GLN", "4262543480008")

@@ -1,16 +1,17 @@
 # article_domain/infrastructure/persistence/mysql_article_repository.py
 """MySQL implementation of Article repository."""
-from src.article_domain.domain.repositories.article_repository import IArticleRepository
-from src.common.dtos.article_dtos import ArticleDataDTO, AttributeDTO, ImageDTO
-from src.common.config.settings import settings
-from src.common.utils.date_utils import format_datetime_for_db, format_date_for_db
-from src.common.exceptions.custom_exceptions import DatabaseError
 import mysql.connector
 from mysql.connector import Error
 
+from src.article_domain.domain.repositories.article_repository import IArticleRepository
+from src.common.config.settings import settings
+from src.common.dtos.article_dtos import ArticleDataDTO, AttributeDTO, ImageDTO
+from src.common.exceptions.custom_exceptions import DatabaseError
+from src.common.utils.date_utils import format_date_for_db, format_datetime_for_db
+
 
 class MySQLArticleRepository(IArticleRepository):
-    def __init__(self):
+    def __init__(self) -> None:
         self._connection = None
 
     def _get_connection(self):
@@ -26,7 +27,7 @@ class MySQLArticleRepository(IArticleRepository):
                 raise DatabaseError(f"Failed to connect to MySQL: {e}", original_exception=e)
         return self._connection
 
-    def create_tables(self):
+    def create_tables(self) -> None:
         """Creates or updates tables for the Article domain with 'pds_' prefix."""
         create_articles_table_query = """
         CREATE TABLE IF NOT EXISTS pds_articles (
@@ -125,7 +126,7 @@ class MySQLArticleRepository(IArticleRepository):
         finally:
             cursor.close()
 
-    def save_article(self, article_dto: ArticleDataDTO):
+    def save_article(self, article_dto: ArticleDataDTO) -> None:
         conn = self._get_connection()
         cursor = conn.cursor()
 
@@ -140,7 +141,7 @@ class MySQLArticleRepository(IArticleRepository):
 
         columns = ", ".join(article_main_data.keys())
         placeholders = ", ".join(["%s"] * len(article_main_data))
-        update_set = ", ".join([f"{col} = %s" for col in article_main_data.keys()])
+        update_set = ", ".join([f"{col} = %s" for col in article_main_data])
 
         insert_query = (
             f"INSERT INTO pds_articles ({columns}) VALUES ({placeholders}) ON DUPLICATE KEY UPDATE {update_set}"
@@ -247,6 +248,6 @@ class MySQLArticleRepository(IArticleRepository):
             cursor.close()
         return article_dto
 
-    def __del__(self):
+    def __del__(self) -> None:
         if self._connection and self._connection.is_connected():
             self._connection.close()

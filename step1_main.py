@@ -161,7 +161,7 @@ def run_gtin_stock_sync_process_optimized() -> None:
 
                 logger.info(f"✅ Completed {supplier_context.supplier_name}: {supplier_items_count} items processed")
 
-            except Exception as e:
+            except Exception as e:  # noqa: PERF203
                 failed_suppliers += 1
                 logger.error(f"❌ Failed to process supplier {supplier_data.get('supplier_name', 'Unknown')}: {e}")
                 # Continue with next supplier even if one fails
