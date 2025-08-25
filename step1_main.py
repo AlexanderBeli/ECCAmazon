@@ -2,6 +2,7 @@
 """Main application entry point for GTIN Stock synchronization with optimizations."""
 
 import json
+import logging
 import os
 import time
 from datetime import datetime
@@ -16,6 +17,7 @@ from src.common.exceptions.custom_exceptions import (
     ApplicationError,
     DatabaseError,
 )
+from src.common.logger_config import setup_logging
 
 # Product Availability Domain Imports (GTIN Stock)
 from src.product_availability_domain.application.gtin_stock_service import (
@@ -30,6 +32,7 @@ from src.product_availability_domain.infrastructure.persistence.mysql_gtin_stock
 
 # Define the path to the suppliers JSON configuration file
 SUPPLIERS_CONFIG_PATH = os.path.join(os.path.dirname(__file__), "src", "common", "config", "suppliers.json")
+logger = logging.getLogger(__name__)
 
 
 def setup_gtin_stock_dependencies() -> tuple[GtinStockApplicationService, MySQLGtinStockRepository]:
@@ -47,9 +50,9 @@ def create_gtin_stock_db_tables() -> None:
     gtin_stock_repo = MySQLGtinStockRepository()
     try:
         gtin_stock_repo.create_tables()
-        print("✅ Database tables created/verified successfully")
+        logger.info("✅ Database tables created/verified successfully")
     except DatabaseError as e:
-        print(f"❌ Error creating GTIN Stock database tables: {e}")
+        logger.error(f"❌ Error creating GTIN Stock database tables: {e}")
         raise  # Re-raise if table creation is critical
     finally:
         # Ensure connection is closed if not managed by a connection pool
@@ -109,10 +112,10 @@ def run_gtin_stock_sync_process_optimized() -> None:
     - Sequential processing to respect API rate limits
     - Progress tracking and error handling per supplier
     """
-    print(f"\n{'='*80}")
-    print(f"🚀 Starting Optimized GTIN Stock Synchronization")
-    print(f"📅 Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"{'='*80}")
+    logger.info(f"\n{'='*80}")
+    logger.info(f"🚀 Starting Optimized GTIN Stock Synchronization")
+    logger.info(f"📅 Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    logger.info(f"{'='*80}")
 
     try:
         # Initialize database and dependencies
@@ -121,7 +124,7 @@ def run_gtin_stock_sync_process_optimized() -> None:
 
         # Load suppliers configuration
         suppliers_list = load_suppliers_config(SUPPLIERS_CONFIG_PATH)
-        print(f"📋 Loaded {len(suppliers_list)} suppliers from configuration")
+        logger.info(f"📋 Loaded {len(suppliers_list)} suppliers from configuration")
 
         total_processed_items = 0
         successful_suppliers = 0
@@ -131,12 +134,12 @@ def run_gtin_stock_sync_process_optimized() -> None:
             try:
                 supplier_context = create_supplier_context(supplier_data)
 
-                print(f"\n{'─'*60}")
-                print(
+                logger.info(f"\n{'─'*60}")
+                logger.info(
                     f"🏭 Processing supplier {supplier_index}/{len(suppliers_list)}: {supplier_context.supplier_name}"
                 )
-                print(f"   GLN: {supplier_context.supplier_gln}")
-                print(f"{'─'*60}")
+                logger.info(f"   GLN: {supplier_context.supplier_gln}")
+                logger.info(f"{'─'*60}")
 
                 # Define batch save callback for intermediate saves
                 def batch_save_callback(context: SupplierContextDTO, items: list[GtinStockItemDTO]) -> None:
@@ -156,39 +159,39 @@ def run_gtin_stock_sync_process_optimized() -> None:
                 total_processed_items += supplier_items_count
                 successful_suppliers += 1
 
-                print(f"✅ Completed {supplier_context.supplier_name}: {supplier_items_count} items processed")
+                logger.info(f"✅ Completed {supplier_context.supplier_name}: {supplier_items_count} items processed")
 
             except Exception as e:
                 failed_suppliers += 1
-                print(f"❌ Failed to process supplier {supplier_data.get('supplier_name', 'Unknown')}: {e}")
+                logger.error(f"❌ Failed to process supplier {supplier_data.get('supplier_name', 'Unknown')}: {e}")
                 # Continue with next supplier even if one fails
                 continue
 
         # Final summary
-        print(f"\n{'='*80}")
-        print(f"📊 SYNCHRONIZATION SUMMARY")
-        print(f"{'='*80}")
-        print(f"✅ Successful suppliers: {successful_suppliers}")
-        print(f"❌ Failed suppliers: {failed_suppliers}")
-        print(f"📦 Total items processed: {total_processed_items}")
-        print(f"⏱️  Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-        print(f"{'='*80}")
+        logger.info(f"\n{'='*80}")
+        logger.info(f"📊 SYNCHRONIZATION SUMMARY")
+        logger.info(f"{'='*80}")
+        logger.info(f"✅ Successful suppliers: {successful_suppliers}")
+        logger.info(f"❌ Failed suppliers: {failed_suppliers}")
+        logger.info(f"📦 Total items processed: {total_processed_items}")
+        logger.info(f"⏱️  Completed at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+        logger.info(f"{'='*80}")
 
         # Example: Display some data from database for verification
         if successful_suppliers > 0:
             display_sample_data(gtin_stock_app_service)
 
     except Exception as e:
-        print(f"💥 Critical error during synchronization: {e}")
+        logger.error(f"💥 Critical error during synchronization: {e}")
         raise
 
 
 def display_sample_data(gtin_stock_app_service: GtinStockApplicationService) -> None:
     """Displays sample data from database for verification after sync."""
     try:
-        print(f"\n{'─'*60}")
-        print(f"🔍 SAMPLE DATA VERIFICATION")
-        print(f"{'─'*60}")
+        logger.info(f"\n{'─'*60}")
+        logger.info(f"🔍 SAMPLE DATA VERIFICATION")
+        logger.info(f"{'─'*60}")
 
         # Get all unique supplier GLNs
         supplier_glns = gtin_stock_app_service.get_unique_supplier_glns()
@@ -206,31 +209,31 @@ def display_sample_data(gtin_stock_app_service: GtinStockApplicationService) -> 
 
             fetched_stock = gtin_stock_app_service.get_supplier_stock_data(sample_context)
 
-            print(f"📋 Sample from GLN: {sample_gln}")
-            print(f"📦 Total items for this supplier: {len(fetched_stock.stock_items)}")
+            logger.info(f"📋 Sample from GLN: {sample_gln}")
+            logger.info(f"📦 Total items for this supplier: {len(fetched_stock.stock_items)}")
 
             # Display first 3 items as sample
             for i, item in enumerate(fetched_stock.stock_items[:3], 1):
-                print(f"   {i}. GTIN: {item.gtin}")
-                print(f"      Quantity: {item.quantity}")
-                print(f"      Traffic Light: {item.stock_traffic_light}")
-                print(f"      Type: {item.item_type}")
-                print(f"      Timestamp: {item.timestamp}")
-                print()
+                logger.info(f"   {i}. GTIN: {item.gtin}")
+                logger.info(f"      Quantity: {item.quantity}")
+                logger.info(f"      Traffic Light: {item.stock_traffic_light}")
+                logger.info(f"      Type: {item.item_type}")
+                logger.info(f"      Timestamp: {item.timestamp}")
+                logger.info()
 
             if len(fetched_stock.stock_items) > 3:
-                print(f"   ... and {len(fetched_stock.stock_items) - 3} more items")
+                logger.info(f"   ... and {len(fetched_stock.stock_items) - 3} more items")
 
         # Display overall statistics
         total_gtins = len(gtin_stock_app_service.get_all_gtin_codes())
         total_suppliers = len(gtin_stock_app_service.get_unique_supplier_glns())
 
-        print(f"📊 DATABASE STATISTICS:")
-        print(f"   Total unique GTINs: {total_gtins}")
-        print(f"   Total suppliers: {total_suppliers}")
+        logger.info(f"📊 DATABASE STATISTICS:")
+        logger.info(f"   Total unique GTINs: {total_gtins}")
+        logger.info(f"   Total suppliers: {total_suppliers}")
 
     except Exception as e:
-        print(f"⚠️  Error displaying sample data: {e}")
+        logger.error(f"⚠️  Error displaying sample data: {e}")
 
 
 def run_legacy_sync_process() -> None:
@@ -238,7 +241,9 @@ def run_legacy_sync_process() -> None:
     Legacy synchronization process (kept for backward compatibility).
     Uses the original sync_all_supplier_stock method.
     """
-    print(f"\n--- Starting Legacy GTIN Stock Synchronization at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
+    logger.info(
+        f"\n--- Starting Legacy GTIN Stock Synchronization at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---"
+    )
 
     create_gtin_stock_db_tables()
     gtin_stock_app_service, _ = setup_gtin_stock_dependencies()
@@ -247,7 +252,7 @@ def run_legacy_sync_process() -> None:
         gtin_stock_app_service.sync_all_supplier_stock(SUPPLIERS_CONFIG_PATH)
 
         # Example of fetching saved data
-        print("\n--- Sample Data Verification ---")
+        logger.info("\n--- Sample Data Verification ---")
         supplier_glns = gtin_stock_app_service.get_unique_supplier_glns()
         if supplier_glns:
             example_supplier_context = SupplierContextDTO(
@@ -259,21 +264,22 @@ def run_legacy_sync_process() -> None:
             )
             fetched_stock = gtin_stock_app_service.get_supplier_stock_data(example_supplier_context)
 
-            print(f"Sample GLN: {supplier_glns[0]}, Items: {len(fetched_stock.stock_items)}")
+            logger.info(f"Sample GLN: {supplier_glns[0]}, Items: {len(fetched_stock.stock_items)}")
             for item in fetched_stock.stock_items[:3]:
-                print(f"  GTIN: {item.gtin}, Qty: {item.quantity}, Light: {item.stock_traffic_light}")
+                logger.info(f"  GTIN: {item.gtin}, Qty: {item.quantity}, Light: {item.stock_traffic_light}")
 
     except (APIError, DatabaseError, ApplicationError) as e:
-        print(f"An error occurred during GTIN Stock synchronization: {e}")
+        logger.error(f"An error occurred during GTIN Stock synchronization: {e}")
     except Exception as e:
-        print(f"An unexpected error occurred: {e}")
+        logger.error(f"An unexpected error occurred: {e}")
 
-    print(f"--- GTIN Stock Synchronization Finished at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
+    logger.info(f"--- GTIN Stock Synchronization Finished at {datetime.now().strftime('%Y-%m-%d %H:%M:%S')} ---")
 
 
 if __name__ == "__main__":
-    print("🎯 Product Data Synchronization Service (GTIN Stock Module)")
-    print("📅 Scheduling GTIN Stock sync for every day at 18:00 Germany time")
+    setup_logging()
+    logger.info("🎯 Product Data Synchronization Service (GTIN Stock Module)")
+    logger.info("📅 Scheduling GTIN Stock sync for every day at 18:00 Germany time")
 
     germany_tz = pytz.timezone("Europe/Berlin")
 
@@ -281,11 +287,11 @@ if __name__ == "__main__":
     schedule.every().day.at("18:00", germany_tz).do(run_gtin_stock_sync_process_optimized)
 
     # For immediate testing, run the optimized process once
-    print("🔄 Running immediate sync for testing...")
+    logger.info("🔄 Running immediate sync for testing...")
     run_gtin_stock_sync_process_optimized()
 
     # Uncomment below for scheduled execution
-    print("⏰ Scheduler started. Waiting for scheduled time...")
+    logger.info("⏰ Scheduler started. Waiting for scheduled time...")
     while True:
         schedule.run_pending()
         time.sleep(30)  # Check every 30 seconds instead of every second
