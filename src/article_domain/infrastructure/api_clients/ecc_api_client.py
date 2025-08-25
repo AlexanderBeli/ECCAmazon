@@ -2,12 +2,15 @@
 """Client for ECC Content Article API."""
 
 import json
+import logging
 
 import requests
 
 from src.common.config.settings import settings
 from src.common.dtos.article_dtos import ArticleDataDTO
 from src.common.exceptions.custom_exceptions import APIError
+
+logger = logging.getLogger(__name__)
 
 
 class ECCApiClient:
@@ -27,7 +30,7 @@ class ECCApiClient:
 
         for su_gln, ean in supplier_gtin_pairs:
             url = f"{self.base_url}/articleData/byEanAndSuGln/{ean}/{su_gln}/{country_code}"
-            print(f"Get data for {ean} {su_gln}")
+            logger.info(f"Get data for {ean} {su_gln}")
 
             try:
                 response = requests.get(url, params=params, timeout=30)
@@ -38,13 +41,13 @@ class ECCApiClient:
                     article_dtos = [ArticleDataDTO.from_api_response(item) for item in data["articles"]]
                     all_fetched_dtos.extend(article_dtos)
                 else:
-                    print(f"No articles found for EAN: {ean}, Supplier GLN: {su_gln}")
+                    logger.warning(f"No articles found for EAN: {ean}, Supplier GLN: {su_gln}")
 
             except requests.exceptions.RequestException as e:
-                print(f"API request failed for EAN {ean}, Supplier GLN {su_gln}: {e}")
+                logger.error(f"API request failed for EAN {ean}, Supplier GLN {su_gln}: {e}")
                 continue  # Continue with next pair instead of failing completely
             except json.JSONDecodeError as e:
-                print(f"Failed to decode JSON response for EAN {ean}, Supplier GLN {su_gln}: {e}")
+                logger.error(f"Failed to decode JSON response for EAN {ean}, Supplier GLN {su_gln}: {e}")
                 continue
 
         return all_fetched_dtos

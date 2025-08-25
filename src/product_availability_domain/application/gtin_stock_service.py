@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 # src/product_availability_domain/application/gtin_stock_service.py
 """Application service for GTIN Stock synchronization with batch processing support."""
 
