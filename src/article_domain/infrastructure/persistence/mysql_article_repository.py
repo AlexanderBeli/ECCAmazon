@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 # article_domain/infrastructure/persistence/mysql_article_repository.py
 """MySQL implementation of Article repository."""
 import mysql.connector

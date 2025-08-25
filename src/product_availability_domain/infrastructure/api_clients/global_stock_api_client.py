@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 """Client for the Global Stock API with batch processing and optimization."""
 
 import concurrent.futures
