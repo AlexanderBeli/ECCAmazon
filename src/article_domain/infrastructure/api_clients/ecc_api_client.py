@@ -1,10 +1,12 @@
 # article_domain/infrastructure/api_clients/ecc_api_client.py
 """Client for ECC Content Article API."""
 
-import requests
 import json
-from src.common.dtos.article_dtos import ArticleDataDTO
+
+import requests
+
 from src.common.config.settings import settings
+from src.common.dtos.article_dtos import ArticleDataDTO
 from src.common.exceptions.custom_exceptions import APIError
 
 
@@ -33,8 +35,8 @@ class ECCApiClient:
                 data = response.json()
 
                 if "articles" in data and data["articles"]:
-                    for article_item in data["articles"]:
-                        all_fetched_dtos.append(ArticleDataDTO.from_api_response(article_item))
+                    article_dtos = [ArticleDataDTO.from_api_response(item) for item in data["articles"]]
+                    all_fetched_dtos.extend(article_dtos)
                 else:
                     print(f"No articles found for EAN: {ean}, Supplier GLN: {su_gln}")
 

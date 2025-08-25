@@ -1,8 +1,8 @@
 """Data Transfer Objects for Article data."""
 
-from dataclasses import dataclass, field
 import dataclasses
-from typing import Optional, Any
+from dataclasses import dataclass, field
+from typing import Any, Optional
 
 
 @dataclass
@@ -100,8 +100,13 @@ class ArticleDataDTO:
         if data.get("images"):
             for img_group in data["images"]:
                 if img_group.get("media"):
-                    for media_item in img_group["media"]:
-                        images.append(ImageDTO(url=media_item.get("file", ""), type="product_image", sortIndex=0))
+                    # Use a list comprehension to build a list of ImageDTOs
+                    new_images = [
+                        ImageDTO(url=media_item.get("file", ""), type="product_image", sortIndex=0)
+                        for media_item in img_group["media"]
+                    ]
+                    # Use list.extend() to add all new_images at once
+                    images.extend(new_images)
 
         # Filter out None values and keys not in ArticleDataDTO
         valid_keys = {f.name for f in dataclasses.fields(cls)}

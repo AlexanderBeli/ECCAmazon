@@ -1,12 +1,13 @@
 # article_domain/infrastructure/persistence/mysql_article_repository.py
 """MySQL implementation of Article repository."""
-from src.article_domain.domain.repositories.article_repository import IArticleRepository
-from src.common.dtos.article_dtos import ArticleDataDTO, AttributeDTO, ImageDTO
-from src.common.config.settings import settings
-from src.common.utils.date_utils import format_datetime_for_db, format_date_for_db
-from src.common.exceptions.custom_exceptions import DatabaseError
 import mysql.connector
 from mysql.connector import Error
+
+from src.article_domain.domain.repositories.article_repository import IArticleRepository
+from src.common.config.settings import settings
+from src.common.dtos.article_dtos import ArticleDataDTO, AttributeDTO, ImageDTO
+from src.common.exceptions.custom_exceptions import DatabaseError
+from src.common.utils.date_utils import format_date_for_db, format_datetime_for_db
 
 
 class MySQLArticleRepository(IArticleRepository):
@@ -140,7 +141,7 @@ class MySQLArticleRepository(IArticleRepository):
 
         columns = ", ".join(article_main_data.keys())
         placeholders = ", ".join(["%s"] * len(article_main_data))
-        update_set = ", ".join([f"{col} = %s" for col in article_main_data.keys()])
+        update_set = ", ".join([f"{col} = %s" for col in article_main_data])
 
         insert_query = (
             f"INSERT INTO pds_articles ({columns}) VALUES ({placeholders}) ON DUPLICATE KEY UPDATE {update_set}"
