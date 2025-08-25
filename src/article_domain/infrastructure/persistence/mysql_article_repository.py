@@ -1,6 +1,8 @@
 # ruff: noqa: E501
 # article_domain/infrastructure/persistence/mysql_article_repository.py
 """MySQL implementation of Article repository."""
+import logging
+
 import mysql.connector
 from mysql.connector import Error
 
@@ -9,6 +11,8 @@ from src.common.config.settings import settings
 from src.common.dtos.article_dtos import ArticleDataDTO, AttributeDTO, ImageDTO
 from src.common.exceptions.custom_exceptions import DatabaseError
 from src.common.utils.date_utils import format_date_for_db, format_datetime_for_db
+
+logger = logging.getLogger(__name__)
 
 
 class MySQLArticleRepository(IArticleRepository):
@@ -120,7 +124,7 @@ class MySQLArticleRepository(IArticleRepository):
             cursor.execute(create_attributes_table_query)
             cursor.execute(create_images_table_query)
             self._get_connection().commit()
-            print("PDS Article tables checked/created.")
+            logger.info("PDS Article tables checked/created.")
         except Error as e:
             self._get_connection().rollback()
             raise DatabaseError(f"Error creating PDS Article tables: {e}", original_exception=e)
