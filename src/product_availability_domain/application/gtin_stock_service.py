@@ -37,7 +37,7 @@ class GtinStockApplicationService:
         Note: This method loads all data before saving. For large datasets,
         consider using sync_all_supplier_stock_optimized instead.
         """
-        print(f"Starting GTIN stock synchronization for all configured suppliers...")
+        logger.info(f"Starting GTIN stock synchronization for all configured suppliers...")
 
         try:
             with open(suppliers_config_path, "r", encoding="utf-8") as f:
@@ -69,7 +69,7 @@ class GtinStockApplicationService:
                 supplier_name=supplier_name,
             )
 
-            print(
+            logger.info(
                 f"\n--- Processing supplier: {supplier_context.supplier_name} (GLN: {supplier_context.supplier_gln}) ---"
             )
 
@@ -78,23 +78,23 @@ class GtinStockApplicationService:
                 stock_response_dto = self.api_client.fetch_gtin_stock_data(supplier_context)
 
                 if not stock_response_dto or not stock_response_dto.stock_items:
-                    print(f"No GTIN stock data received from API for {supplier_context.supplier_name}.")
+                    logger.warning(f"No GTIN stock data received from API for {supplier_context.supplier_name}.")
                     continue
 
                 # Save all items in a single batch for better performance
                 self.stock_repo.batch_save_gtin_stock_items(supplier_context, stock_response_dto.stock_items)
 
-                print(
+                logger.info(
                     f"GTIN stock synchronization completed for {len(stock_response_dto.stock_items)} items for {supplier_context.supplier_name}."
                 )
 
             except Exception as e:
                 logger.error(f"Error syncing stock for {supplier_context.supplier_name}: {e}")
-                print(f"An error occurred while syncing stock for {supplier_context.supplier_name}: {e}")
+                logger.error(f"An error occurred while syncing stock for {supplier_context.supplier_name}: {e}")
                 # Continue with next supplier even if one fails
                 continue
 
-        print("GTIN stock synchronization for all suppliers finished.")
+        logger.info("GTIN stock synchronization for all suppliers finished.")
 
     def sync_all_supplier_stock_optimized(self, suppliers_config_path: str, batch_size: int = 100) -> None:
         """
@@ -105,7 +105,7 @@ class GtinStockApplicationService:
             suppliers_config_path: Path to suppliers configuration JSON
             batch_size: Number of GTINs to process in each batch
         """
-        print(f"Starting optimized GTIN stock synchronization for all configured suppliers...")
+        logger.info(f"Starting optimized GTIN stock synchronization for all configured suppliers...")
 
         try:
             with open(suppliers_config_path, "r", encoding="utf-8") as f:
@@ -137,7 +137,7 @@ class GtinStockApplicationService:
                 supplier_name=supplier_name,
             )
 
-            print(
+            logger.info(
                 f"\n--- Processing supplier: {supplier_context.supplier_name} (GLN: {supplier_context.supplier_gln}) ---"
             )
 
@@ -156,17 +156,17 @@ class GtinStockApplicationService:
                     save_callback=batch_save_callback,
                 )
 
-                print(
+                logger.info(
                     f"Optimized GTIN stock synchronization completed for {len(stock_response_dto.stock_items)} items for {supplier_context.supplier_name}."
                 )
 
             except Exception as e:
                 logger.error(f"Error syncing stock for {supplier_context.supplier_name}: {e}")
-                print(f"An error occurred while syncing stock for {supplier_context.supplier_name}: {e}")
+                logger.error(f"An error occurred while syncing stock for {supplier_context.supplier_name}: {e}")
                 # Continue with next supplier even if one fails
                 continue
 
-        print("Optimized GTIN stock synchronization for all suppliers finished.")
+        logger.info("Optimized GTIN stock synchronization for all suppliers finished.")
 
     def sync_supplier_stock_with_callback(
         self, supplier_context: SupplierContextDTO, batch_size: int = 100, progress_callback: callable = None
@@ -182,7 +182,7 @@ class GtinStockApplicationService:
         Returns:
             GtinStockResponseDTO with all processed items
         """
-        print(f"Starting stock sync for supplier: {supplier_context.supplier_name}")
+        logger.info(f"Starting stock sync for supplier: {supplier_context.supplier_name}")
 
         # Define batch save callback
         def batch_save_callback(context: SupplierContextDTO, items: list[GtinStockItemDTO]) -> None:

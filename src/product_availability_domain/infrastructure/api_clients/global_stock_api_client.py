@@ -2,6 +2,7 @@
 
 import concurrent.futures
 import json
+import logging
 import time
 from datetime import datetime
 from threading import Lock
@@ -18,6 +19,8 @@ from src.common.dtos.availability_dtos import (
     SupplierContextDTO,
 )
 from src.common.exceptions.custom_exceptions import APIError
+
+logger = logging.getLogger(__name__)
 
 
 class GlobalStockApiClient:
@@ -93,10 +96,10 @@ class GlobalStockApiClient:
             response.raise_for_status()
             return response.json()
         except requests.exceptions.Timeout:
-            print(f"⏳ Timeout for GTIN {gtin}")
+            logger.warning(f"⏳ Timeout for GTIN {gtin}")
             return {}
         except requests.exceptions.RequestException as e:
-            print(f"❌ Error for GTIN {gtin}: {e}")
+            logger.error(f"❌ Error for GTIN {gtin}: {e}")
             return {}
 
     def _process_gtin_batch(
@@ -113,7 +116,7 @@ class GlobalStockApiClient:
                 self._processed_count += 1
                 current_count = self._processed_count
 
-            print(f"🔄 Batch {batch_num}/{total_batches} - Processing GTIN {current_count}: {gtin}")
+            logger.info(f"🔄 Batch {batch_num}/{total_batches} - Processing GTIN {current_count}: {gtin}")
 
             result = self.get_gtin_availability(gtin, supplier_gln)
 
@@ -151,12 +154,12 @@ class GlobalStockApiClient:
         Optimized version that processes GTINs in batches with optional concurrent processing
         and periodic saving to prevent data loss.
         """
-        print(f"📦 Starting optimized stock query for: {supplier_context.supplier_name}")
+        logger.info(f"📦 Starting optimized stock query for: {supplier_context.supplier_name}")
 
         gtins = self.get_gtins_with_stock(supplier_context.supplier_gln)
         total_gtins = len(gtins)
 
-        print(f"🔍 Fetching article details for {total_gtins} GTINs in batches of {batch_size}...")
+        logger.info(f"🔍 Fetching article details for {total_gtins} GTINs in batches of {batch_size}...")
 
         # Reset processed counter
         self._processed_count = 0
@@ -169,7 +172,7 @@ class GlobalStockApiClient:
         if max_workers == 1:
             # Sequential processing for better API rate limiting control
             for batch_num, batch_gtins in enumerate(gtin_batches, 1):
-                print(f"📝 Processing batch {batch_num}/{total_batches} ({len(batch_gtins)} GTINs)")
+                logger.info(f"📝 Processing batch {batch_num}/{total_batches} ({len(batch_gtins)} GTINs)")
 
                 batch_items = self._process_gtin_batch(
                     batch_gtins, supplier_context.supplier_gln, batch_num, total_batches
@@ -180,9 +183,9 @@ class GlobalStockApiClient:
                 if save_callback and batch_items:
                     try:
                         save_callback(supplier_context, batch_items)
-                        print(f"💾 Saved batch {batch_num} ({len(batch_items)} items)")
+                        logger.info(f"💾 Saved batch {batch_num} ({len(batch_items)} items)")
                     except Exception as e:
-                        print(f"⚠️ Failed to save batch {batch_num}: {e}")
+                        logger.error(f"⚠️ Failed to save batch {batch_num}: {e}")
 
                 # Brief pause between batches
                 if batch_num < total_batches:
@@ -207,14 +210,16 @@ class GlobalStockApiClient:
                         if save_callback and batch_items:
                             try:
                                 save_callback(supplier_context, batch_items)
-                                print(f"💾 Saved batch {batch_num} ({len(batch_items)} items)")
+                                logger.info(f"💾 Saved batch {batch_num} ({len(batch_items)} items)")
                             except Exception as e:
-                                print(f"⚠️ Failed to save batch {batch_num}: {e}")
+                                logger.error(f"⚠️ Failed to save batch {batch_num}: {e}")
 
                     except Exception as exc:
-                        print(f"❌ Batch {batch_num} generated an exception: {exc}")
+                        logger.error(f"❌ Batch {batch_num} generated an exception: {exc}")
 
-        print(f"✅ Stock query completed. Processed {total_gtins} GTINs, found {len(all_fetched_items)} stock items.")
+        logger.info(
+            f"✅ Stock query completed. Processed {total_gtins} GTINs, found {len(all_fetched_items)} stock items."
+        )
         return GtinStockResponseDTO(supplier_context=supplier_context, stock_items=all_fetched_items)
 
     def fetch_gtin_stock_data(self, supplier_context: SupplierContextDTO) -> GtinStockResponseDTO:
