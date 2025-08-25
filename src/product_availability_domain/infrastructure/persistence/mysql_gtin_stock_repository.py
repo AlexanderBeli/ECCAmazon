@@ -1,3 +1,4 @@
+# ruff: noqa: E501
 # src/product_availability_domain/mysql_gtin_stock_repository
 """MySQL implementation of GTIN Stock repository."""
 
