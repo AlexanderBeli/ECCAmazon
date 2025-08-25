@@ -1,12 +1,13 @@
 # article_domain/domain/repositories/article_repository.py
 """Article repository interface."""
 from abc import ABC, abstractmethod
+
 from src.common.dtos.article_dtos import ArticleDataDTO
 
 
 class IArticleRepository(ABC):
     @abstractmethod
-    def save_article(self, article_data: ArticleDataDTO):
+    def save_article(self, article_data: ArticleDataDTO) -> None:
         """Saves or updates article data in the persistence layer."""
         pass
 

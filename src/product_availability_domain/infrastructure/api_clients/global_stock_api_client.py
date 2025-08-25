@@ -231,7 +231,7 @@ class GlobalStockApiClient:
             supplier_context=supplier_context, batch_size=100, max_workers=1  # Sequential processing by default
         )
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Clean up the session when the object is destroyed."""
         if hasattr(self, "session"):
             self.session.close()

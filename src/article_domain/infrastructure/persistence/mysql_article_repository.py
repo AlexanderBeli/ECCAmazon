@@ -11,7 +11,7 @@ from src.common.utils.date_utils import format_date_for_db, format_datetime_for_
 
 
 class MySQLArticleRepository(IArticleRepository):
-    def __init__(self):
+    def __init__(self) -> None:
         self._connection = None
 
     def _get_connection(self):
@@ -27,7 +27,7 @@ class MySQLArticleRepository(IArticleRepository):
                 raise DatabaseError(f"Failed to connect to MySQL: {e}", original_exception=e)
         return self._connection
 
-    def create_tables(self):
+    def create_tables(self) -> None:
         """Creates or updates tables for the Article domain with 'pds_' prefix."""
         create_articles_table_query = """
         CREATE TABLE IF NOT EXISTS pds_articles (
@@ -126,7 +126,7 @@ class MySQLArticleRepository(IArticleRepository):
         finally:
             cursor.close()
 
-    def save_article(self, article_dto: ArticleDataDTO):
+    def save_article(self, article_dto: ArticleDataDTO) -> None:
         conn = self._get_connection()
         cursor = conn.cursor()
 
@@ -248,6 +248,6 @@ class MySQLArticleRepository(IArticleRepository):
             cursor.close()
         return article_dto
 
-    def __del__(self):
+    def __del__(self) -> None:
         if self._connection and self._connection.is_connected():
             self._connection.close()
