@@ -6,20 +6,6 @@ from typing import Any, Optional
 
 
 @dataclass
-class AttributeDTO:
-    key: str
-    value: Optional[str] = None
-    unit: Optional[str] = None
-
-
-@dataclass
-class ImageDTO:
-    url: str
-    type: Optional[str] = None
-    sortIndex: Optional[int] = None
-
-
-@dataclass
 class ArticleDataDTO:
     eccId: int
     ean: Optional[str] = None
@@ -60,8 +46,16 @@ class ArticleDataDTO:
     currency: Optional[str] = None
     countryIso: Optional[str] = None
     originCountry: Optional[str] = None
-    attributes: list[AttributeDTO] = field(default_factory=list)
-    images: list[ImageDTO] = field(default_factory=list)
+
+    colorCode: Optional[str] = None
+    colorName: Optional[str] = None
+    easColor: Optional[str] = None
+    customsTariffNumber: Optional[str] = None
+    tax: Optional[int] = None
+    shoeWidth: Optional[str] = None
+    innerMaterial: Optional[str] = None
+    orgColor: Optional[str] = None
+    images: list = field(default_factory=list)
 
     @classmethod
     def from_api_response(cls, data: dict[str, Any]) -> "ArticleDataDTO":
@@ -79,12 +73,28 @@ class ArticleDataDTO:
             "articleName": data.get("articleName"),
             "currency": data.get("currency"),
             "seasonName": data.get("seasonTxt"),
+            # Добавленные поля
+            "colorCode": data.get("colorCode"),
+            "colorName": data.get("colorName"),
+            "customsTariffNumber": data.get("customsTariffNumber"),
+            "tax": data.get("tax"),
+            "shoeWidth": data.get("shoeWidth"),
+            "innerMaterial": data.get("innerMaterial"),
+            "orgColor": data.get("orgColor"),
         }
 
         # Handle season data
         if data.get("season") and isinstance(data["season"], dict):
             mapped_data["seasonEccId"] = data["season"].get("id")
             mapped_data["seasonName"] = data["season"].get("value")
+
+        # Handle easColor
+        if data.get("easColor") and isinstance(data["easColor"], dict):
+            mapped_data["easColor"] = data["easColor"].get("value")
+
+        # Handle originCountry
+        if data.get("originCountry") and isinstance(data["originCountry"], dict):
+            mapped_data["originCountry"] = data["originCountry"].get("value")
 
         # Extract EAN from assortment if available
         if data.get("assortment") and data["assortment"].get("de"):
@@ -95,18 +105,15 @@ class ArticleDataDTO:
                 mapped_data["pricePricat"] = assortment_items[0].get("primeCost")
                 mapped_data["priceRetail"] = assortment_items[0].get("retailPrice")
 
-        # Handle images
+        # Handle images - extract all file URLs from media
         images = []
         if data.get("images"):
             for img_group in data["images"]:
                 if img_group.get("media"):
-                    # Use a list comprehension to build a list of ImageDTOs
-                    new_images = [
-                        ImageDTO(url=media_item.get("file", ""), type="product_image", sortIndex=0)
-                        for media_item in img_group["media"]
-                    ]
-                    # Use list.extend() to add all new_images at once
-                    images.extend(new_images)
+                    for i, media_item in enumerate(img_group["media"]):
+                        file_url = media_item.get("file")
+                        if file_url:
+                            images.append(file_url)
 
         # Filter out None values and keys not in ArticleDataDTO
         valid_keys = {f.name for f in dataclasses.fields(cls)}
@@ -116,4 +123,4 @@ class ArticleDataDTO:
             if k in valid_keys and v is not None and k not in ["attributes", "images"]
         }
 
-        return cls(**filtered_data, attributes=[], images=images)
+        return cls(**filtered_data)
