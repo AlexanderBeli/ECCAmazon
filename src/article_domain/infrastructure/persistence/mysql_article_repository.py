@@ -37,10 +37,10 @@ class MySQLArticleRepository(IArticleRepository):
         """Creates or updates tables for the Article domain with 'pds_' prefix."""
         create_articles_table_query = """
         CREATE TABLE IF NOT EXISTS pds_articles (
-            eccId INT UNSIGNED PRIMARY KEY,
-            ean VARCHAR(255),
+            eccId INT UNSIGNED,
+            ean VARCHAR(255) NOT NULL,
             mainArticleEccId INT UNSIGNED,
-            suGln VARCHAR(255),
+            suGln VARCHAR(255) NOT NULL,
             mfGln VARCHAR(255),
             suArticleNumber VARCHAR(255),
             mfArticleNumber VARCHAR(255),
@@ -73,6 +73,7 @@ class MySQLArticleRepository(IArticleRepository):
             priceRetail DECIMAL(10, 2),
             priceBase DECIMAL(10, 2),
             taxClass VARCHAR(50),
+            tax INT UNSIGNED,
             currency VARCHAR(10),
             countryIso VARCHAR(10),
             originCountry VARCHAR(255),
@@ -80,12 +81,19 @@ class MySQLArticleRepository(IArticleRepository):
             colorName VARCHAR(255),
             easColor VARCHAR(100),
             customsTariffNumber VARCHAR(50),
-            tax INT UNSIGNED,
             shoeWidth VARCHAR(10),
+            materialName VARCHAR(255),
             innerMaterial VARCHAR(255),
+            deliveryFrom VARCHAR(50),
             orgColor VARCHAR(50),
+            size VARCHAR(10),
+            eccSizeId INT UNSIGNED,
+            sizeOriginal VARCHAR(20),
+            sortIdx INT UNSIGNED,
+            sizeOrderQuantity INT UNSIGNED,
             images JSON,
-            INDEX (ean),
+            PRIMARY KEY (ean, suGln),
+            INDEX (eccId),
             INDEX (mainArticleEccId),
             INDEX (suGln),
             INDEX (mfGln),
@@ -101,7 +109,10 @@ class MySQLArticleRepository(IArticleRepository):
             INDEX (productSubGroupEccId),
             INDEX (productFamilyEccId),
             INDEX (colorCode),
-            INDEX (colorName)
+            INDEX (colorName),
+            INDEX (size),
+            INDEX (eccSizeId),
+            INDEX (sortIdx)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """
 
@@ -120,16 +131,29 @@ class MySQLArticleRepository(IArticleRepository):
         conn = self._get_connection()
         cursor = conn.cursor()
 
+        # Проверяем обязательные поля перед сохранением
+        if not article_dto.ean or not article_dto.suGln:
+            error_msg = (
+                f"Cannot save article: missing required fields - ean: {article_dto.ean}, suGln: {article_dto.suGln}"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
+
         article_main_data = article_dto.__dict__.copy()
 
+        # Обработка дат
         article_main_data["dateChanged"] = format_datetime_for_db(article_main_data.get("dateChanged"))
         article_main_data["seasonDateFrom"] = format_date_for_db(article_main_data.get("seasonDateFrom"))
         article_main_data["seasonDateTo"] = format_date_for_db(article_main_data.get("seasonDateTo"))
 
+        # Обработка изображений
         if "images" in article_main_data and article_main_data["images"]:
             article_main_data["images"] = json.dumps(article_main_data["images"])
         else:
             article_main_data["images"] = json.dumps([])
+
+        # Удаляем None значения для корректной вставки
+        article_main_data = {k: v for k, v in article_main_data.items() if v is not None}
 
         columns = ", ".join(article_main_data.keys())
         placeholders = ", ".join(["%s"] * len(article_main_data))
@@ -142,12 +166,36 @@ class MySQLArticleRepository(IArticleRepository):
         params = values + values
 
         try:
+            logger.info(
+                f"Attempting to save article: EAN={article_dto.ean}, suGln={article_dto.suGln}, eccId={article_dto.eccId}"
+            )
             cursor.execute(insert_query, params)
+
+            # Проверяем результат операции
+            if cursor.rowcount > 0:
+                if cursor.rowcount == 1:
+                    logger.info(f"Article inserted: EAN={article_dto.ean}, suGln={article_dto.suGln}")
+                elif cursor.rowcount == 2:
+                    logger.info(f"Article updated: EAN={article_dto.ean}, suGln={article_dto.suGln}")
+            else:
+                logger.warning(f"No rows affected for article: EAN={article_dto.ean}, suGln={article_dto.suGln}")
+
             conn.commit()
-            logger.info(f"Article {article_dto.eccId} saved successfully.")
+            logger.info(f"Article {article_dto.eccId} (EAN={article_dto.ean}) saved successfully.")
+
         except Error as e:
             conn.rollback()
-            raise DatabaseError(f"Error saving article {article_dto.eccId}: {e}", original_exception=e)
+            logger.error(f"Failed to save article: EAN={article_dto.ean}, suGln={article_dto.suGln}, Error: {e}")
+            # Добавляем более детальную информацию об ошибке
+            if "Duplicate entry" in str(e):
+                logger.error(f"Duplicate key error - this should not happen with ON DUPLICATE KEY UPDATE")
+            elif "Data too long" in str(e):
+                logger.error(f"Data too long error - check field lengths")
+            elif "cannot be null" in str(e):
+                logger.error(f"NULL constraint violation - check required fields")
+            raise DatabaseError(
+                f"Error saving article EAN={article_dto.ean}, suGln={article_dto.suGln}: {e}", original_exception=e
+            )
         finally:
             cursor.close()
 

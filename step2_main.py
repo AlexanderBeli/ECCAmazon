@@ -74,6 +74,7 @@ def run_gtin_article_sync() -> None:
 
         logger.info("\n--- Synchronizing article data using supplier GLN and GTIN pairs ---")
 
+        supplier_gtin_pairs = supplier_gtin_pairs[:10]
         article_app_service.sync_articles_from_ecc(supplier_gtin_pairs)
 
         logger.info("Completed processing all supplier GLN and GTIN pairs")
@@ -87,7 +88,7 @@ def run_gtin_article_sync() -> None:
 
 
 if __name__ == "__main__":
-    setup_logging()
+    setup_logging(log_file="logs/my_app.log")
     logger.info("Starting GTIN article data synchronization...")
     run_gtin_article_sync()
     logger.info("GTIN article synchronization completed.")

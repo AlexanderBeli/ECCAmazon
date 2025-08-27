@@ -25,5 +25,6 @@ class ArticleApplicationService:
             return
 
         for article_dto in article_dtos:
+            logger.info("Saving started...")
             self.article_repo.save_article(article_dto)
         logger.info(f"Synchronization completed. Processed {len(article_dtos)} articles.")
