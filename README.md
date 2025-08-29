@@ -5,6 +5,7 @@ This project implements a service for synchronizing product data from various ex
 - [Architecture Overview](#architecture-overview)
 - [Getting Started](#getting-started)
 - [Testing](#testing)
+- [TODO list](TODO.md)
 - [Contributing](#contributing)
 
 ## Architecture Overview
@@ -18,10 +19,9 @@ The project follows a modular, layered architecture:
       - `exceptions/`: Custom exception classes for consistent error handling.
       - `utils/`: General utility functions (e.g., date formatting).
       - `config/`: Manages application settings, including sensitive information (API keys, database credentials) loaded from environment variables (`.env` file).
-    - **`core/`**: (Optional) For very generic, shared domain-level concepts if applicable.
     - **`article_domain/`**: Represents the primary Bounded Context for **Article data management**. This module encapsulates all logic related to detailed product information (e.g., descriptions, images, attributes).
       - `application/`: Contains application services that orchestrate operations, coordinating domain services and infrastructure components. Handles use cases like "sync article details from ECC".
-      - `domain/`: The core business logic. Defines `Article` entities, `Attribute` and `Image` value objects, and abstract `IArticleRepository` interfaces.
+      - `domain/`: The core business logic. Defines abstract `IArticleRepository` interfaces.
       - `infrastructure/`: Provides concrete implementations for `IArticleRepository` (e.g., `MySQLArticleRepository` saving to `pds_articles` tables) and `ECCApiClient`.
     - **`product_availability_domain/`**: A dedicated Bounded Context for **Product Availability and Pricing data**. This module handles the synchronization of EAN (GTIN) codes, quantities, and prices, typically associated with a specific retailer and supplier context.
       - `application/`: Application services for use cases like "sync EAN availability data".
@@ -31,7 +31,7 @@ The project follows a modular, layered architecture:
 
 2.  **`main.py`**: The entry point of the application, responsible for setting up dependency injection and initiating the main process flows for different domains. It also handles initial database table creation.
 
-For now use only `step1_main.py`.
+For now use separately `step1_main.py` and `step2_main.py`.
 
 3.  **`tests/`**: Contains unit and integration tests, mirroring the `src/` directory structure.
 
@@ -94,7 +94,8 @@ cp .env.example .env
 ### 6. Run the Application
 
 ```bash
-python main.py
+python step1_main.py
+python step2_main.py
 ```
 
 ## Testing

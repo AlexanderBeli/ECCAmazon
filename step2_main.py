@@ -1,4 +1,4 @@
-"""Main application entry point for GTIN article synchronization."""
+"""Main application entry point for GTIN article synchronization with batch processing."""
 
 import logging
 
@@ -25,13 +25,17 @@ from src.product_availability_domain.infrastructure.persistence.mysql_gtin_stock
 
 logger = logging.getLogger(__name__)
 
+BATCH_SIZE = getattr(settings, "ARTICLE_BATCH_SIZE", 100)
+
 
 def setup_dependencies() -> tuple[ArticleApplicationService, GtinStockApplicationService]:
     """Initializes and wires up application dependencies."""
     # Article Domain Dependencies
     ecc_api_client = ECCApiClient()
     article_repository = MySQLArticleRepository()
-    article_app_service = ArticleApplicationService(article_repo=article_repository, ecc_api_client=ecc_api_client)
+    article_app_service = ArticleApplicationService(
+        article_repo=article_repository, ecc_api_client=ecc_api_client, batch_size=BATCH_SIZE
+    )
     global_stock_api_client = GlobalStockApiClient()
 
     # GTIN Stock Domain Dependencies
@@ -56,7 +60,7 @@ def create_article_tables() -> None:
 
 
 def run_gtin_article_sync() -> None:
-    """Main process: get supplier GLN and GTIN pairs, fetch article data, save to MySQL."""
+    """Main process: get supplier GLN and GTIN pairs, fetch article data, save to MySQL in batches."""
     create_article_tables()
     article_app_service, gtin_stock_service = setup_dependencies()
 
@@ -72,8 +76,11 @@ def run_gtin_article_sync() -> None:
 
         logger.info(f"Found {len(supplier_gtin_pairs)} unique supplier GLN and GTIN pairs")
 
-        logger.info("\n--- Synchronizing article data using supplier GLN and GTIN pairs ---")
+        logger.info(f"Using batch size: {BATCH_SIZE} pairs per batch")
 
+        logger.info("\n--- Synchronizing article data using supplier GLN and GTIN pairs (batch processing) ---")
+
+        # supplier_gtin_pairs = supplier_gtin_pairs[:10]
         article_app_service.sync_articles_from_ecc(supplier_gtin_pairs)
 
         logger.info("Completed processing all supplier GLN and GTIN pairs")
@@ -87,7 +94,7 @@ def run_gtin_article_sync() -> None:
 
 
 if __name__ == "__main__":
-    setup_logging()
-    logger.info("Starting GTIN article data synchronization...")
+    setup_logging(log_file="logs/my_app.log")
+    logger.info("Starting GTIN article data synchronization with batch processing (batch size: {BATCH_SIZE})...")
     run_gtin_article_sync()
     logger.info("GTIN article synchronization completed.")

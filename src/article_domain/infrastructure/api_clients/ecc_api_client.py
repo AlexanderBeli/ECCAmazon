@@ -38,7 +38,7 @@ class ECCApiClient:
                 data = response.json()
 
                 if "articles" in data and data["articles"]:
-                    article_dtos = [ArticleDataDTO.from_api_response(item) for item in data["articles"]]
+                    article_dtos = [ArticleDataDTO.from_api_response(item, ean) for item in data["articles"]]
                     all_fetched_dtos.extend(article_dtos)
                 else:
                     logger.warning(f"No articles found for EAN: {ean}, Supplier GLN: {su_gln}")

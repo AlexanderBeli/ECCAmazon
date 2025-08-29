@@ -1,6 +1,7 @@
 # ruff: noqa: E501
 # article_domain/infrastructure/persistence/mysql_article_repository.py
 """MySQL implementation of Article repository."""
+import json
 import logging
 
 import mysql.connector
@@ -8,7 +9,7 @@ from mysql.connector import Error
 
 from src.article_domain.domain.repositories.article_repository import IArticleRepository
 from src.common.config.settings import settings
-from src.common.dtos.article_dtos import ArticleDataDTO, AttributeDTO, ImageDTO
+from src.common.dtos.article_dtos import ArticleDataDTO
 from src.common.exceptions.custom_exceptions import DatabaseError
 from src.common.utils.date_utils import format_date_for_db, format_datetime_for_db
 
@@ -36,10 +37,10 @@ class MySQLArticleRepository(IArticleRepository):
         """Creates or updates tables for the Article domain with 'pds_' prefix."""
         create_articles_table_query = """
         CREATE TABLE IF NOT EXISTS pds_articles (
-            eccId INT UNSIGNED PRIMARY KEY,
-            ean VARCHAR(255),
+            eccId INT UNSIGNED,
+            ean VARCHAR(255) NOT NULL,
             mainArticleEccId INT UNSIGNED,
-            suGln VARCHAR(255),
+            suGln VARCHAR(255) NOT NULL,
             mfGln VARCHAR(255),
             suArticleNumber VARCHAR(255),
             mfArticleNumber VARCHAR(255),
@@ -72,10 +73,27 @@ class MySQLArticleRepository(IArticleRepository):
             priceRetail DECIMAL(10, 2),
             priceBase DECIMAL(10, 2),
             taxClass VARCHAR(50),
+            tax INT UNSIGNED,
             currency VARCHAR(10),
             countryIso VARCHAR(10),
             originCountry VARCHAR(255),
-            INDEX (ean),
+            colorCode VARCHAR(50),
+            colorName VARCHAR(255),
+            easColor VARCHAR(100),
+            customsTariffNumber VARCHAR(50),
+            shoeWidth VARCHAR(10),
+            materialName VARCHAR(255),
+            innerMaterial VARCHAR(255),
+            deliveryFrom VARCHAR(50),
+            orgColor VARCHAR(50),
+            size VARCHAR(10),
+            eccSizeId INT UNSIGNED,
+            sizeOriginal VARCHAR(20),
+            sortIdx INT UNSIGNED,
+            sizeOrderQuantity INT UNSIGNED,
+            images JSON,
+            PRIMARY KEY (ean, suGln),
+            INDEX (eccId),
             INDEX (mainArticleEccId),
             INDEX (suGln),
             INDEX (mfGln),
@@ -89,45 +107,23 @@ class MySQLArticleRepository(IArticleRepository):
             INDEX (productCategoryEccId),
             INDEX (productGroupEccId),
             INDEX (productSubGroupEccId),
-            INDEX (productFamilyEccId)
+            INDEX (productFamilyEccId),
+            INDEX (colorCode),
+            INDEX (colorName),
+            INDEX (size),
+            INDEX (eccSizeId),
+            INDEX (sortIdx)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
         """
 
-        create_attributes_table_query = """
-        CREATE TABLE IF NOT EXISTS pds_article_attributes (
-            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-            article_eccId INT UNSIGNED NOT NULL,
-            attribute_key VARCHAR(255) NOT NULL,
-            attribute_value TEXT,
-            attribute_unit VARCHAR(50),
-            FOREIGN KEY (article_eccId) REFERENCES pds_articles(eccId) ON DELETE CASCADE,
-            INDEX (article_eccId),
-            INDEX (attribute_key)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """
-
-        create_images_table_query = """
-        CREATE TABLE IF NOT EXISTS pds_article_images (
-            id BIGINT UNSIGNED PRIMARY KEY AUTO_INCREMENT,
-            article_eccId INT UNSIGNED NOT NULL,
-            image_url VARCHAR(1024) NOT NULL,
-            image_type VARCHAR(50),
-            sort_index SMALLINT UNSIGNED,
-            FOREIGN KEY (article_eccId) REFERENCES pds_articles(eccId) ON DELETE CASCADE,
-            INDEX (article_eccId),
-            INDEX (image_type)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-        """
         cursor = self._get_connection().cursor()
         try:
             cursor.execute(create_articles_table_query)
-            cursor.execute(create_attributes_table_query)
-            cursor.execute(create_images_table_query)
             self._get_connection().commit()
-            logger.info("PDS Article tables checked/created.")
+            logger.info("PDS Article table checked/created.")
         except Error as e:
             self._get_connection().rollback()
-            raise DatabaseError(f"Error creating PDS Article tables: {e}", original_exception=e)
+            raise DatabaseError(f"Error creating PDS Article table: {e}", original_exception=e)
         finally:
             cursor.close()
 
@@ -135,14 +131,29 @@ class MySQLArticleRepository(IArticleRepository):
         conn = self._get_connection()
         cursor = conn.cursor()
 
-        article_main_data = article_dto.__dict__.copy()
-        for key in ["attributes", "images"]:
-            if key in article_main_data:
-                del article_main_data[key]
+        # Проверяем обязательные поля перед сохранением
+        if not article_dto.ean or not article_dto.suGln:
+            error_msg = (
+                f"Cannot save article: missing required fields - ean: {article_dto.ean}, suGln: {article_dto.suGln}"
+            )
+            logger.error(error_msg)
+            raise ValueError(error_msg)
 
+        article_main_data = article_dto.__dict__.copy()
+
+        # Обработка дат
         article_main_data["dateChanged"] = format_datetime_for_db(article_main_data.get("dateChanged"))
         article_main_data["seasonDateFrom"] = format_date_for_db(article_main_data.get("seasonDateFrom"))
         article_main_data["seasonDateTo"] = format_date_for_db(article_main_data.get("seasonDateTo"))
+
+        # Обработка изображений
+        if "images" in article_main_data and article_main_data["images"]:
+            article_main_data["images"] = json.dumps(article_main_data["images"])
+        else:
+            article_main_data["images"] = json.dumps([])
+
+        # Удаляем None значения для корректной вставки
+        article_main_data = {k: v for k, v in article_main_data.items() if v is not None}
 
         columns = ", ".join(article_main_data.keys())
         placeholders = ", ".join(["%s"] * len(article_main_data))
@@ -155,71 +166,71 @@ class MySQLArticleRepository(IArticleRepository):
         params = values + values
 
         try:
+            logger.info(
+                f"Attempting to save article: EAN={article_dto.ean}, suGln={article_dto.suGln}, eccId={article_dto.eccId}"
+            )
             cursor.execute(insert_query, params)
 
-            cursor.execute("DELETE FROM pds_article_attributes WHERE article_eccId = %s", (article_dto.eccId,))
-            cursor.execute("DELETE FROM pds_article_images WHERE article_eccId = %s", (article_dto.eccId,))
-
-            if article_dto.attributes:
-                attr_values = [(article_dto.eccId, attr.key, attr.value, attr.unit) for attr in article_dto.attributes]
-                cursor.executemany(
-                    """
-                    INSERT INTO pds_article_attributes (article_eccId, attribute_key, attribute_value, attribute_unit)
-                    VALUES (%s, %s, %s, %s)
-                """,
-                    attr_values,
-                )
-
-            if article_dto.images:
-                img_values = [(article_dto.eccId, img.url, img.type, img.sortIndex) for img in article_dto.images]
-                cursor.executemany(
-                    """
-                    INSERT INTO pds_article_images (article_eccId, image_url, image_type, sort_index)
-                    VALUES (%s, %s, %s, %s)
-                """,
-                    img_values,
-                )
+            # Проверяем результат операции
+            if cursor.rowcount > 0:
+                if cursor.rowcount == 1:
+                    logger.info(f"Article inserted: EAN={article_dto.ean}, suGln={article_dto.suGln}")
+                elif cursor.rowcount == 2:
+                    logger.info(f"Article updated: EAN={article_dto.ean}, suGln={article_dto.suGln}")
+            else:
+                logger.warning(f"No rows affected for article: EAN={article_dto.ean}, suGln={article_dto.suGln}")
 
             conn.commit()
+            logger.info(f"Article {article_dto.eccId} (EAN={article_dto.ean}) saved successfully.")
+
         except Error as e:
             conn.rollback()
-            raise DatabaseError(f"Error saving article {article_dto.eccId}: {e}", original_exception=e)
+            logger.error(f"Failed to save article: EAN={article_dto.ean}, suGln={article_dto.suGln}, Error: {e}")
+            # Добавляем более детальную информацию об ошибке
+            if "Duplicate entry" in str(e):
+                logger.error(f"Duplicate key error - this should not happen with ON DUPLICATE KEY UPDATE")
+            elif "Data too long" in str(e):
+                logger.error(f"Data too long error - check field lengths")
+            elif "cannot be null" in str(e):
+                logger.error(f"NULL constraint violation - check required fields")
+            raise DatabaseError(
+                f"Error saving article EAN={article_dto.ean}, suGln={article_dto.suGln}: {e}", original_exception=e
+            )
         finally:
             cursor.close()
 
-    def get_all_articles(self) -> list[ArticleDataDTO]:
+    def get_all_articles(self, limit: int = None, offset: int = 0) -> list[ArticleDataDTO]:
         conn = self._get_connection()
         cursor = conn.cursor(dictionary=True)
-        all_articles_dtos = []
+        query = "SELECT * FROM pds_articles"
+        params = []
+
+        if limit is not None:
+            query += " LIMIT %s OFFSET %s"
+            params = [limit, offset]
 
         try:
-            cursor.execute("SELECT * FROM pds_articles")
-            articles_raw = cursor.fetchall()
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
 
-            for art_raw in articles_raw:
-                cursor.execute(
-                    "SELECT attribute_key as key, attribute_value as value, attribute_unit as unit FROM pds_article_attributes WHERE article_eccId = %s",
-                    (art_raw["eccId"],),
-                )
-                attributes_raw = cursor.fetchall()
-                attributes_dtos = [AttributeDTO(**a) for a in attributes_raw]
+            articles = []
+            for row in rows:
+                if row.get("images"):
+                    try:
+                        row["images"] = json.loads(row["images"])
+                    except (json.JSONDecodeError, TypeError):
+                        row["images"] = []
+                else:
+                    row["images"] = []
 
-                cursor.execute(
-                    "SELECT image_url as url, image_type as type, sort_index as sortIndex FROM pds_article_images WHERE article_eccId = %s",
-                    (art_raw["eccId"],),
-                )
-                images_raw = cursor.fetchall()
-                images_dtos = [ImageDTO(**i) for i in images_raw]
+                articles.append(ArticleDataDTO(**row))
 
-                article_dto_data = {k: v for k, v in art_raw.items() if k not in ["attributes", "images"]}
-                all_articles_dtos.append(
-                    ArticleDataDTO(**article_dto_data, attributes=attributes_dtos, images=images_dtos)
-                )
+            return articles
+
         except Error as e:
-            raise DatabaseError(f"Error fetching all articles: {e}", original_exception=e)
+            raise DatabaseError(f"Error fetching articles: {e}", original_exception=e)
         finally:
             cursor.close()
-        return all_articles_dtos
 
     def get_article_by_ecc_id(self, ecc_id: int) -> ArticleDataDTO | None:
         """Retrieves a single article by its ECC ID."""
@@ -228,25 +239,17 @@ class MySQLArticleRepository(IArticleRepository):
         article_dto = None
         try:
             cursor.execute("SELECT * FROM pds_articles WHERE eccId = %s", (ecc_id,))
-            art_raw = cursor.fetchone()
+            row = cursor.fetchone()
 
-            if art_raw:
-                cursor.execute(
-                    "SELECT attribute_key as key, attribute_value as value, attribute_unit as unit FROM pds_article_attributes WHERE article_eccId = %s",
-                    (art_raw["eccId"],),
-                )
-                attributes_raw = cursor.fetchall()
-                attributes_dtos = [AttributeDTO(**a) for a in attributes_raw]
+            if row.get("images"):
+                try:
+                    row["images"] = json.loads(row["images"])
+                except (json.JSONDecodeError, TypeError):
+                    row["images"] = []
+            else:
+                row["images"] = []
 
-                cursor.execute(
-                    "SELECT image_url as url, image_type as type, sort_index as sortIndex FROM pds_article_images WHERE article_eccId = %s",
-                    (art_raw["eccId"],),
-                )
-                images_raw = cursor.fetchall()
-                images_dtos = [ImageDTO(**i) for i in images_raw]
-
-                article_dto_data = {k: v for k, v in art_raw.items() if k not in ["attributes", "images"]}
-                article_dto = ArticleDataDTO(**article_dto_data, attributes=attributes_dtos, images=images_dtos)
+            article_dto = ArticleDataDTO(**row)
         except Error as e:
             raise DatabaseError(f"Error fetching article by eccId {ecc_id}: {e}", original_exception=e)
         finally:
@@ -256,3 +259,63 @@ class MySQLArticleRepository(IArticleRepository):
     def __del__(self) -> None:
         if self._connection and self._connection.is_connected():
             self._connection.close()
+
+    def delete_article(self, ecc_id: int) -> None:
+        """Delete article by eccId."""
+        conn = self._get_connection()
+        cursor = conn.cursor()
+
+        try:
+            cursor.execute("DELETE FROM pds_articles WHERE eccId = %s", (ecc_id,))
+            conn.commit()
+
+            if cursor.rowcount == 0:
+                logger.warning(f"Article with eccId {ecc_id} not found for deletion")
+            else:
+                logger.info(f"Article {ecc_id} deleted successfully.")
+
+        except Error as e:
+            conn.rollback()
+            raise DatabaseError(f"Error deleting article {ecc_id}: {e}", original_exception=e)
+        finally:
+            cursor.close()
+
+    def search_articles(self, **filters) -> list[ArticleDataDTO]:
+        """Search articles by different filtres."""
+        conn = self._get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        where_conditions = []
+        params = []
+
+        for field, value in filters.items():
+            if value is not None:
+                where_conditions.append(f"{field} = %s")
+                params.append(value)
+
+        query = "SELECT * FROM pds_articles"
+        if where_conditions:
+            query += " WHERE " + " AND ".join(where_conditions)
+
+        try:
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+
+            articles = []
+            for row in rows:
+                if row.get("images"):
+                    try:
+                        row["images"] = json.loads(row["images"])
+                    except (json.JSONDecodeError, TypeError):
+                        row["images"] = []
+                else:
+                    row["images"] = []
+
+                articles.append(ArticleDataDTO(**row))
+
+            return articles
+
+        except Error as e:
+            raise DatabaseError(f"Error searching articles: {e}", original_exception=e)
+        finally:
+            cursor.close()

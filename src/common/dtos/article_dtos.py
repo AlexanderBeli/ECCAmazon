@@ -1,22 +1,11 @@
 """Data Transfer Objects for Article data."""
 
 import dataclasses
+import logging
 from dataclasses import dataclass, field
 from typing import Any, Optional
 
-
-@dataclass
-class AttributeDTO:
-    key: str
-    value: Optional[str] = None
-    unit: Optional[str] = None
-
-
-@dataclass
-class ImageDTO:
-    url: str
-    type: Optional[str] = None
-    sortIndex: Optional[int] = None
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -57,17 +46,34 @@ class ArticleDataDTO:
     priceRetail: Optional[float] = None
     priceBase: Optional[float] = None
     taxClass: Optional[str] = None
+    tax: Optional[int] = None
     currency: Optional[str] = None
     countryIso: Optional[str] = None
     originCountry: Optional[str] = None
-    attributes: list[AttributeDTO] = field(default_factory=list)
-    images: list[ImageDTO] = field(default_factory=list)
+
+    colorCode: Optional[str] = None
+    colorName: Optional[str] = None
+    easColor: Optional[str] = None
+    customsTariffNumber: Optional[str] = None
+    deliveryFrom: Optional[str] = None
+    shoeWidth: Optional[str] = None
+    materialName: Optional[str] = None
+    innerMaterial: Optional[str] = None
+    orgColor: Optional[str] = None
+    images: list = field(default_factory=list)
+
+    size: Optional[str] = None
+    eccSizeId: Optional[int] = None
+    sizeOriginal: Optional[str] = None
+    sortIdx: Optional[int] = None
+    sizeOrderQuantity: Optional[int] = None
 
     @classmethod
-    def from_api_response(cls, data: dict[str, Any]) -> "ArticleDataDTO":
+    def from_api_response(cls, data: dict[str, Any], ean: str) -> "ArticleDataDTO":
         """Creates ArticleDataDTO from API response with new structure."""
         # Map API fields to DTO fields
         mapped_data = {
+            "ean": ean,
             "eccId": data.get("eccId"),
             "suGln": data.get("suGln"),
             "mfGln": data.get("mfGln"),
@@ -79,41 +85,86 @@ class ArticleDataDTO:
             "articleName": data.get("articleName"),
             "currency": data.get("currency"),
             "seasonName": data.get("seasonTxt"),
+            # Добавленные поля
+            "colorCode": data.get("colorCode"),
+            "colorName": data.get("colorName"),
+            "customsTariffNumber": data.get("customsTariffNumber"),
+            "tax": data.get("tax"),
+            "deliveryFrom": str(data.get("deliveryFrom")) if data.get("deliveryFrom") else None,  # Преобразуем в строку
+            "shoeWidth": data.get("shoeWidth"),
+            "materialName": data.get("materialName"),
+            "innerMaterial": data.get("innerMaterial"),
+            "orgColor": data.get("orgColor"),
         }
+
+        # Check PRIMARY KEY
+        if not mapped_data.get("ean") or not mapped_data.get("suGln"):
+            logger.error(f"Missing required fields: ean={mapped_data.get('ean')}, suGln={mapped_data.get('suGln')}")
+            raise ValueError(f"EAN and suGln are required for PRIMARY KEY")
 
         # Handle season data
         if data.get("season") and isinstance(data["season"], dict):
             mapped_data["seasonEccId"] = data["season"].get("id")
             mapped_data["seasonName"] = data["season"].get("value")
 
-        # Extract EAN from assortment if available
+        # Handle easColor
+        if data.get("easColor") and isinstance(data["easColor"], dict):
+            mapped_data["easColor"] = data["easColor"].get("value")
+
+        # Handle originCountry
+        if data.get("originCountry") and isinstance(data["originCountry"], dict):
+            mapped_data["originCountry"] = data["originCountry"].get("value")
+
+        # Extract EAN data from assortment if available
         if data.get("assortment") and data["assortment"].get("de"):
             assortment_items = data["assortment"]["de"]
-            if assortment_items and len(assortment_items) > 0:
-                mapped_data["ean"] = assortment_items[0].get("ean")
-                # Get pricing from first item
-                mapped_data["pricePricat"] = assortment_items[0].get("primeCost")
-                mapped_data["priceRetail"] = assortment_items[0].get("retailPrice")
 
-        # Handle images
+            found_item = next((item for item in assortment_items if item.get("ean") == ean), None)
+
+            if not found_item and assortment_items:
+                logger.warning(f"EAN {ean} not found in assortment, using first item")
+                found_item = assortment_items[0]  # Fallback to first item
+
+            if found_item:
+                mapped_data.update(
+                    {
+                        "size": found_item.get("sizeCleared"),
+                        "pricePricat": found_item.get("primeCost"),
+                        "priceRetail": found_item.get("retailPrice"),
+                        "eccSizeId": found_item.get("eccSizeId"),
+                        "sizeOriginal": found_item.get("sizeOriginal"),
+                        "sortIdx": found_item.get("sortIdx"),
+                        "sizeOrderQuantity": found_item.get("sizeOrderQuantity"),
+                    }
+                )
+            else:
+                logger.warning(f"No assortment data found for EAN {ean}")
+
+        # Handle images - extract all file URLs from media
         images = []
+
+        # imageNameWwsImport if exist
+        if data.get("imageNameWwsImport"):
+            images.append(data["imageNameWwsImport"])
+
         if data.get("images"):
             for img_group in data["images"]:
                 if img_group.get("media"):
-                    # Use a list comprehension to build a list of ImageDTOs
-                    new_images = [
-                        ImageDTO(url=media_item.get("file", ""), type="product_image", sortIndex=0)
-                        for media_item in img_group["media"]
-                    ]
-                    # Use list.extend() to add all new_images at once
-                    images.extend(new_images)
+                    for media_item in img_group["media"]:
+                        file_url = media_item.get("file")
+                        if file_url:
+                            images.append(file_url)
 
-        # Filter out None values and keys not in ArticleDataDTO
+        mapped_data["images"] = images
+
         valid_keys = {f.name for f in dataclasses.fields(cls)}
         filtered_data = {
             k: v
             for k, v in mapped_data.items()
-            if k in valid_keys and v is not None and k not in ["attributes", "images"]
+            if k in valid_keys and (k in ["ean", "suGln", "images"] or v is not None)
         }
 
-        return cls(**filtered_data, attributes=[], images=images)
+        # logger.info(f"Mapped data keys: {list(filtered_data.keys())}")
+        logger.info(f"EAN: {filtered_data.get('ean')}, suGln: {filtered_data.get('suGln')}")
+
+        return cls(**filtered_data)
