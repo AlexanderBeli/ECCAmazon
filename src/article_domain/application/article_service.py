@@ -68,7 +68,7 @@ class ArticleApplicationService:
                 batch_saved_count = 0
                 batch_failed_count = 0
 
-                for article_dto in article_dtos:
+                for article_dto in article_dtos:  # noqa: PERF203
                     try:
                         self.article_repo.save_article(article_dto)
                         batch_saved_count += 1
