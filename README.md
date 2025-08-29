@@ -5,6 +5,7 @@ This project implements a service for synchronizing product data from various ex
 - [Architecture Overview](#architecture-overview)
 - [Getting Started](#getting-started)
 - [Testing](#testing)
+- [TODO list](TODO.md)
 - [Contributing](#contributing)
 
 ## Architecture Overview
@@ -93,7 +94,8 @@ cp .env.example .env
 ### 6. Run the Application
 
 ```bash
-python main.py
+python step1_main.py
+python step2_main.py
 ```
 
 ## Testing
