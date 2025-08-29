@@ -5,3 +5,5 @@
 - Make the speed faster (getting information about articles in step1 and step2 - for example using multiprocessing for batches). For step2 for 12 483 items the program spent 5h.
 - For watching pictures we need use url+?token. For the future using maybe we should think about how to use pictures because putting url address with token on web is not a good idea for sure
 - Also a liitle detail is timing for getting article information - once a month or once in 6 month? Updating all articles or adding only those wich are not in the database?
+- It is hard to connect with Items table for now because I use `PRIMARY KEY (ean, suGln),` in table for not creating dublicates.
+- 3. Put logic from `step1_main.py` and `step2_main.py` to the `main.py`. Or maybe split `step2_main.py` into 2 functions: 1.adding not existed EAN each 1-3 month and 2.update all each 6-12 month.
