@@ -1,0 +1,7 @@
+- 1. Fix 6 errors in tests. After updating I didn't fix tests.
+- 2. Check all retailers' JSON response for analysing data and adding columns to pds_articles and maybe to delete not using ones. I think maybe better to check 1-2 items per supplier for getting result and fix columns in table, because they have differences, I only used 2 suppliers for adding columns but it seems that maybe better to analyze each and their maybe the same sense but different names in each suppliers JSON response
+- Now the program saves 1 by 1 to MySQL. Change save method to executemany
+- Fix small things according to linters.
+- Make the speed faster (getting information about articles in step1 and step2 - for example using multiprocessing for batches). For step2 for 12 483 items the program spent 5h.
+- For watching pictures we need use url+?token. For the future using maybe we should think about how to use pictures because putting url address with token on web is not a good idea for sure
+- Also a liitle detail is timing for getting article information - once a month or once in 6 month? Updating all articles or adding only those wich are not in the database?
