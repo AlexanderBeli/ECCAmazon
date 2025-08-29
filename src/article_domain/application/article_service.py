@@ -68,11 +68,11 @@ class ArticleApplicationService:
                 batch_saved_count = 0
                 batch_failed_count = 0
 
-                for article_dto in article_dtos:  # noqa: PERF203
+                for article_dto in article_dtos:
                     try:
                         self.article_repo.save_article(article_dto)
                         batch_saved_count += 1
-                    except Exception as e:
+                    except Exception as e:  # noqa: PERF203
                         batch_failed_count += 1
                         gtin = getattr(article_dto, "gtin", "unknown")
                         logger.error(f"Failed to save article {gtin}: {e}")
